@@ -131,18 +131,4 @@ export class PaymentsService {
     }
     return cancelled;
   }
-
-  /** PAY-7: admin-initiated provider refund for a paid order the store cannot fulfil. */
-  async refund(orderId: string): Promise<void> {
-    const order = await this.orders.findById(orderId);
-    if (!order) throw new NotFoundException('Order not found');
-    if (order.status !== 'CANCELLED' || !order.paidAt) throw new BadRequestException('Only cancelled, paid orders can be refunded');
-    if (!order.paymentProvider || order.paymentProvider === 'CREDIT' || !order.paymentReference) {
-      throw new BadRequestException('This order was not paid through a payment provider');
-    }
-    const provider = this.registry.get(order.paymentProvider);
-    if (!provider.refund) throw new BadRequestException(`${provider.displayName} refunds must be issued from the provider dashboard`);
-    await provider.refund(order.paymentReference, order.amountDueKobo);
-    await this.orders.addNote(order.id, `Provider refund of ${order.amountDueKobo} kobo requested via ${provider.displayName}`, 'admin');
-  }
 }

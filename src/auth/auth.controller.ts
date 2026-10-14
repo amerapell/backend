@@ -1,18 +1,26 @@
-import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { CookieOptions, Request, Response } from 'express';
 import { AppConfig } from '../config/app-config';
 import { AuthService } from './auth.service';
 import { REFRESH_COOKIE } from './token.service';
-import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './auth.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthUser } from '../common/auth-types';
+import { ForgotPasswordDto, GoogleSignInDto, LoginDto, RegisterDto, ResetPasswordDto, VerifyEmailDto } from './auth.dto';
 
 export function refreshCookieOptions(config: AppConfig, expiresAt?: Date): CookieOptions {
   const prod = config.isProduction;
   return {
     httpOnly: true,
     secure: prod,
-    // Frontend (Vercel) and API (Railway) are different sites in production → SameSite=None; Secure.
-    sameSite: prod ? 'none' : 'lax',
+    // First-party: the browser reaches the API through the frontend's own origin (Vercel rewrite /api/v1/* →
+    // Railway), so the cookie is set on the shop's host with no Domain attribute. 'lax' is enough (every call
+    // is same-site) and keeps Safari ITP / Instagram / TikTok webviews from dropping it as third-party; it
+    // also blocks cross-site POSTs from carrying it. A stale client still calling Railway cross-site simply
+    // gets no cookie (signed out), never an error.
+    sameSite: 'lax',
+    // Matches the proxied paths the browser calls: /api/v1/auth/refresh and /api/v1/auth/logout.
     path: '/api/v1/auth',
     expires: expiresAt,
   };
@@ -44,6 +52,29 @@ export class AuthController {
     const { refresh, ...body } = await this.auth.login(dto.email, dto.password);
     this.setCookie(res, refresh);
     return body;
+  }
+
+  /** Same response + refresh cookie as /auth/login. */
+  @Post('google')
+  @HttpCode(200)
+  async google(@Body() dto: GoogleSignInDto, @Res({ passthrough: true }) res: Response) {
+    const { refresh, ...body } = await this.auth.googleSignIn(dto.credential);
+    this.setCookie(res, refresh);
+    return body;
+  }
+
+  @Post('verify-email')
+  @HttpCode(200)
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.auth.verifyEmail(dto.token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 3, ttl: 15 * 60_000 } })
+  resendVerification(@CurrentUser() user: AuthUser) {
+    return this.auth.resendVerification(user.id);
   }
 
   @Post('refresh')

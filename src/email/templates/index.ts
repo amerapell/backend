@@ -176,7 +176,7 @@ export function exchangeRequestedAdminEmail(ex: Exchange, customerEmail: string,
         exchangeItems(ex) +
         (ex.note ? paragraph(`${monoLabel('Note')}<br>${esc(ex.note)}`) : '') +
         (ex.photoUrls.length ? paragraph(ex.photoUrls.map((u, n) => `<a href="${esc(u)}" style="color:${BRAND.navy};">Photo ${n + 1}</a>`).join(' · ')) : ''),
-      cta: { label: 'Review in admin', url: `${ctx.frontendUrl}/admin/exchanges` },
+      cta: { label: 'Review in admin', url: `${ctx.frontendUrl}/admin/exchanges/${ex.id}` },
     }),
     text: toText([`Exchange ${ex.number} requested on ${ex.orderNumber} by ${customerEmail}. Reason: ${ex.reason}`]),
   };
@@ -259,6 +259,22 @@ export function passwordResetEmail(firstName: string, link: string): RenderedEma
       cta: { label: 'Reset password', url: link },
     }),
     text: toText(['Reset your Amerapelle password (valid 1 hour):', link]),
+  };
+}
+
+export function verifyEmailEmail(firstName: string, link: string): RenderedEmail {
+  return {
+    subject: 'Confirm your email',
+    html: renderLayout({
+      preheader: 'Confirm your email to use exchange credit and see past orders.',
+      eyebrow: 'Account · Confirm your email',
+      headlineHtml: 'One last <em>step.</em>',
+      bodyHtml:
+        paragraph(`Hi ${esc(firstName || 'there')}, welcome to Amerapelle. Confirm this is your email address so we can link your exchange credit and past orders to your account.`) +
+        paragraph('The link below is valid for 24 hours. If you did not create an account, you can ignore this email.'),
+      cta: { label: 'Confirm email', url: link },
+    }),
+    text: toText(['Confirm your Amerapelle email (valid 24 hours):', link]),
   };
 }
 

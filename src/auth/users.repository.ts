@@ -1,12 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../db/database.module';
-import { passwordResetTokens, refreshTokens, users } from '../db/schema';
+import { emailVerificationTokens, passwordResetTokens, refreshTokens, users } from '../db/schema';
 import type { UserRow } from '../db/schema';
 
 export const USERS_REPOSITORY = Symbol('USERS_REPOSITORY');
 
-export type NewUser = Pick<UserRow, 'email' | 'passwordHash' | 'firstName' | 'lastName' | 'phone' | 'marketingConsent'> & { role?: UserRow['role'] };
+export type NewUser = Pick<UserRow, 'email' | 'passwordHash' | 'firstName' | 'lastName' | 'phone' | 'marketingConsent'> & {
+  role?: UserRow['role'];
+  emailVerifiedAt?: Date | null;
+  googleSub?: string | null;
+};
 
 export interface UsersRepository {
   findByEmail(email: string): Promise<UserRow | null>;
@@ -19,6 +23,12 @@ export interface UsersRepository {
   revokeAllRefreshTokens(userId: string, at: Date): Promise<void>;
   saveResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
   consumeResetToken(tokenHash: string, now: Date): Promise<string | null>;
+  findByGoogleSub(sub: string): Promise<UserRow | null>;
+  saveVerificationToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
+  /** Marks the token used and returns its user; null when unknown, already used or expired. */
+  consumeVerificationToken(tokenHash: string, now: Date): Promise<string | null>;
+  findVerificationToken(tokenHash: string): Promise<{ userId: string; usedAt: Date | null } | null>;
+  latestVerificationTokenAt(userId: string): Promise<Date | null>;
 }
 
 @Injectable()
@@ -71,5 +81,37 @@ export class DrizzleUsersRepository implements UsersRepository {
       .where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt), gt(passwordResetTokens.expiresAt, now)))
       .returning({ userId: passwordResetTokens.userId });
     return r?.userId ?? null;
+  }
+  async findByGoogleSub(sub: string) {
+    const [r] = await this.db.select().from(users).where(eq(users.googleSub, sub)).limit(1);
+    return r ?? null;
+  }
+  async saveVerificationToken(userId: string, tokenHash: string, expiresAt: Date) {
+    await this.db.insert(emailVerificationTokens).values({ userId, tokenHash, expiresAt });
+  }
+  async consumeVerificationToken(tokenHash: string, now: Date) {
+    const [r] = await this.db
+      .update(emailVerificationTokens)
+      .set({ usedAt: now })
+      .where(and(eq(emailVerificationTokens.tokenHash, tokenHash), isNull(emailVerificationTokens.usedAt), gt(emailVerificationTokens.expiresAt, now)))
+      .returning({ userId: emailVerificationTokens.userId });
+    return r?.userId ?? null;
+  }
+  async findVerificationToken(tokenHash: string) {
+    const [r] = await this.db
+      .select({ userId: emailVerificationTokens.userId, usedAt: emailVerificationTokens.usedAt })
+      .from(emailVerificationTokens)
+      .where(eq(emailVerificationTokens.tokenHash, tokenHash))
+      .limit(1);
+    return r ?? null;
+  }
+  async latestVerificationTokenAt(userId: string) {
+    const [r] = await this.db
+      .select({ at: emailVerificationTokens.createdAt })
+      .from(emailVerificationTokens)
+      .where(eq(emailVerificationTokens.userId, userId))
+      .orderBy(desc(emailVerificationTokens.createdAt))
+      .limit(1);
+    return r?.at ?? null;
   }
 }

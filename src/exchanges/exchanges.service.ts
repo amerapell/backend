@@ -1,13 +1,14 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CLOCK, Clock } from '../common/clock';
 import type { AuthUser } from '../common/auth-types';
-import type { Exchange, ExchangeStatus, OrderStatus } from '../common/contract';
+import type { AdminExchange, AdminExchangeDetail, Exchange, ExchangeStatus, OrderStatus } from '../common/contract';
 import { SettingsService } from '../settings/settings.service';
 import { NotificationsService } from '../email/notifications.service';
 import { CreditService } from '../credit/credit.service';
+import { EMAIL_VERIFICATION_LOOKUP, EmailVerificationLookup } from '../credit/email-verification.lookup';
 import { ORDERS_REPOSITORY, OrdersRepository } from '../orders/orders.repository';
 import { EXCHANGES_REPOSITORY, ExchangesRepository } from './exchanges.repository';
-import { toExchange } from './exchange-presenter';
+import { toAdminExchange, toAdminExchangeDetail, toExchange } from './exchange-presenter';
 import { assertExchangeTransition, InvalidTransitionError, isWithinExchangeWindow } from './exchange-status';
 
 export interface ExchangeRequestInput {
@@ -32,6 +33,7 @@ export class ExchangesService {
     private readonly settings: SettingsService,
     private readonly credit: CreditService,
     private readonly notifications: NotificationsService,
+    @Inject(EMAIL_VERIFICATION_LOOKUP) private readonly verification: EmailVerificationLookup,
   ) {}
 
   async request(input: ExchangeRequestInput, user: AuthUser | undefined): Promise<Exchange> {
@@ -84,12 +86,27 @@ export class ExchangesService {
     return toExchange(agg);
   }
 
+  /** Exchanges on the account, plus guest exchanges placed with its email once that email is verified. */
   async forCustomer(user: AuthUser): Promise<Exchange[]> {
-    return (await this.repo.loadMany(await this.repo.idsForCustomer(user.id, user.email))).map(toExchange);
+    const email = (await this.verification.isVerified(user.id)) ? user.email : null;
+    return (await this.repo.loadMany(await this.repo.idsForCustomer(user.id, email))).map(toExchange);
   }
 
-  async adminList(status?: ExchangeStatus): Promise<Exchange[]> {
-    return (await this.repo.loadMany(await this.repo.idsForAdmin(status))).map(toExchange);
+  async adminList(status?: ExchangeStatus): Promise<AdminExchange[]> {
+    return (await this.repo.loadMany(await this.repo.idsForAdmin(status))).map(toAdminExchange);
+  }
+
+  /** ADM: single exchange with customer contact, linked order, delivery window and item details. */
+  async adminDetail(id: string): Promise<AdminExchangeDetail> {
+    const agg = await this.repo.load(id);
+    if (!agg) throw new NotFoundException('Exchange not found');
+    const [order, items, { exchangeWindowDays }] = await Promise.all([
+      this.orders.findById(agg.exchange.orderId),
+      this.orders.items(agg.exchange.orderId),
+      this.settings.get(),
+    ]);
+    if (!order) throw new NotFoundException('Order not found');
+    return toAdminExchangeDetail(agg, order, items, exchangeWindowDays);
   }
 
   private async move(id: string, to: ExchangeStatus, note: string | null) {

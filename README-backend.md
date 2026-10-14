@@ -37,7 +37,7 @@ There is one Nest module per domain. Controllers stay thin. Services depend on i
 | `catalogue` | Collections, product listing with filters, facets, `pg_trgm` search with suggestions, PDP, related items, badges, and the inventory snapshots used by the cart and checkout |
 | `cart` | Guest carts (`X-Cart-Token`) and user carts, merge on login, promo codes, stock checks |
 | `checkout` | Quote and order creation (`PENDING_PAYMENT`, 15-minute stock holds, credit). An order paid fully by credit becomes `PAID` without a provider |
-| `payments` | `PaymentProvider` interface with the Paystack and Bachs adapters, a registry that respects the admin toggles, idempotent raw-body webhooks (`webhook_events` is unique on provider + event id), verification, the hold-expiry cron and refunds |
+| `payments` | `PaymentProvider` interface with the Paystack and Bachs adapters, a registry that respects the admin toggles, idempotent raw-body webhooks (`webhook_events` is unique on provider + event id), verification and the hold-expiry cron (no refunds — exchange credit only, PAY-7) |
 | `orders` | Order presenter, guest lookup, and the lifecycle: paid, cancelled or expired, and admin status changes with emails |
 | `exchanges`, `credit` | EXC-1..8: exchange state machine, restocking, and a credit ledger with optional expiry |
 | `auth`, `me` | Register and login, rotating `ap_rt` refresh cookie, password reset, profile, addresses, wishlist, credit, NDPA export and delete |

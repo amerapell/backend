@@ -15,6 +15,7 @@ import { allocateProportionally } from '../common/money';
 import { normalizeNigerianPhone } from '../common/phone';
 import { CartIdentity, CartService, PricedCart } from '../cart/cart.service';
 import { CreditService } from '../credit/credit.service';
+import { EMAIL_VERIFICATION_LOOKUP, EmailVerificationLookup } from '../credit/email-verification.lookup';
 import { DELIVERY_ZONES_REPOSITORY, DeliveryZonesRepository, CONTENT_REPOSITORY, ContentRepository } from '../content/content.repository';
 import { ORDERS_REPOSITORY, OrdersRepository, CreditUnavailableError, InsufficientStockError, NewOrderItem } from '../orders/orders.repository';
 import { OrdersService } from '../orders/orders.service';
@@ -51,6 +52,7 @@ export class CheckoutService {
     private readonly registry: PaymentProviderRegistry,
     private readonly addresses: AddressesService,
     private readonly settings: SettingsService,
+    @Inject(EMAIL_VERIFICATION_LOOKUP) private readonly verification: EmailVerificationLookup,
   ) {}
 
   private async zone(code: ZoneCode): Promise<DeliveryZoneRow> {
@@ -72,7 +74,8 @@ export class CheckoutService {
       freeDeliveryPromo: promo?.valid ? promo.freeDelivery : false,
       zone: { code: zone.code, feeKobo: zone.feeKobo },
       freeDeliveryThresholdKobo,
-      creditAvailableKobo: user ? await this.credit.balance(user.email) : 0,
+      // Credit is tied to the email address: only an account that has verified it may spend it.
+      creditAvailableKobo: user && (await this.verification.isVerified(user.id)) ? await this.credit.balance(user.email) : 0,
       useCredit,
     });
   }

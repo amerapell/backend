@@ -47,10 +47,11 @@ async function main(): Promise<void> {
         firstName: 'Amerapelle',
         lastName: 'Admin',
         role: 'ADMIN',
+        emailVerifiedAt: new Date(),
       });
       log(`admin created: ${config.adminEmail}`);
     } else {
-      const patch: Partial<typeof schema.users.$inferInsert> = { role: 'ADMIN' };
+      const patch: Partial<typeof schema.users.$inferInsert> = { role: 'ADMIN', emailVerifiedAt: existing.emailVerifiedAt ?? new Date() };
       if (process.env.SEED_RESET_ADMIN_PASSWORD === 'true') patch.passwordHash = await bcrypt.hash(config.adminPassword, 12);
       await db.update(schema.users).set(patch).where(eq(schema.users.id, existing.id));
       log(`admin exists: ${config.adminEmail}${patch.passwordHash ? ' (password reset)' : ''}`);

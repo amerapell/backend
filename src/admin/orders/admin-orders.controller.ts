@@ -9,7 +9,6 @@ import { parsePage } from '../../common/pagination';
 import { ORDERS_REPOSITORY, OrdersRepository } from '../../orders/orders.repository';
 import { OrdersService } from '../../orders/orders.service';
 import { OrderLifecycleService } from '../../orders/order-lifecycle.service';
-import { PaymentsService } from '../../payments/payments.service';
 import { SettingsService } from '../../settings/settings.service';
 import { ExchangesService } from '../../exchanges/exchanges.service';
 import { ExchangeActionDto } from '../../exchanges/exchanges.dto';
@@ -31,7 +30,6 @@ export class AdminOrdersController {
     @Inject(ORDERS_REPOSITORY) private readonly repo: OrdersRepository,
     private readonly orders: OrdersService,
     private readonly lifecycle: OrderLifecycleService,
-    private readonly payments: PaymentsService,
     private readonly settings: SettingsService,
   ) {}
 
@@ -90,14 +88,6 @@ export class AdminOrdersController {
     res.type('html');
     return renderPackingSlip(d, d.notes, await this.settings.get());
   }
-
-  /** Addition (PAY-7, P1): provider refund for a cancelled paid order the store could not fulfil. */
-  @Post(':id/refund')
-  @HttpCode(200)
-  async refund(@Param('id') id: string) {
-    await this.payments.refund(id);
-    return this.detail(id);
-  }
 }
 
 @AdminController('exchanges')
@@ -112,30 +102,36 @@ export class AdminExchangesController {
 
   @Get(':id')
   get(@Param('id') id: string) {
-    return this.exchanges.get(id);
+    return this.exchanges.adminDetail(id);
   }
 
   @Post(':id/approve')
   @HttpCode(200)
-  approve(@Param('id') id: string, @Body() dto: ExchangeActionDto) {
-    return this.exchanges.approve(id, dto.note);
+  async approve(@Param('id') id: string, @Body() dto: ExchangeActionDto) {
+    await this.exchanges.approve(id, dto.note);
+    return this.exchanges.adminDetail(id);
   }
 
   @Post(':id/decline')
   @HttpCode(200)
-  decline(@Param('id') id: string, @Body() dto: ExchangeActionDto) {
-    return this.exchanges.decline(id, dto.note);
+  async decline(@Param('id') id: string, @Body() dto: ExchangeActionDto) {
+    // The reason is emailed to the customer, so a decline must always say why.
+    if (!dto.note?.trim()) throw new BadRequestException('Give the customer a reason for declining');
+    await this.exchanges.decline(id, dto.note.trim());
+    return this.exchanges.adminDetail(id);
   }
 
   @Post(':id/receive')
   @HttpCode(200)
-  receive(@Param('id') id: string, @Body() dto: ExchangeActionDto) {
-    return this.exchanges.receive(id, dto.note);
+  async receive(@Param('id') id: string, @Body() dto: ExchangeActionDto) {
+    await this.exchanges.receive(id, dto.note);
+    return this.exchanges.adminDetail(id);
   }
 
   @Post(':id/complete')
   @HttpCode(200)
-  complete(@Param('id') id: string, @Body() dto: ExchangeActionDto) {
-    return this.exchanges.complete(id, dto.note);
+  async complete(@Param('id') id: string, @Body() dto: ExchangeActionDto) {
+    await this.exchanges.complete(id, dto.note);
+    return this.exchanges.adminDetail(id);
   }
 }

@@ -13,7 +13,12 @@ async function bootstrap(): Promise<void> {
   const config = app.get(AppConfig);
   const logger = new Logger('Bootstrap');
 
-  app.set('trust proxy', 1); // Railway sits behind a proxy: needed for per-IP throttling and secure cookies.
+  // Browser traffic now arrives shopper → Vercel (rewrite /api/v1/*) → Railway edge → here, so there are two
+  // proxy hops. Trust the whole X-Forwarded-For chain: req.ip = the left-most entry = the shopper's IP (Vercel
+  // overwrites any client-supplied X-Forwarded-For), so the throttler (which keys on req.ip) limits each shopper
+  // separately instead of all shoppers sharing Vercel's egress IP. Webhooks (Paystack/Bachs → Railway directly)
+  // are @SkipThrottle and read req.rawBody, which proxy settings do not affect.
+  app.set('trust proxy', true);
   app.setGlobalPrefix('api/v1');
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cookieParser());

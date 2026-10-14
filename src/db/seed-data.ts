@@ -431,7 +431,7 @@ We work with Adire dyers in Abeokuta and Aso-oke weavers, and we put that cloth 
 - If your next order costs more, pay the difference. If it costs less, the rest stays as credit.
 - Credit is never paid out as cash.
 - Jewellery and pieces marked “not exchangeable” cannot be exchanged.
-- If we cannot fulfil an order you have paid for, we refund you to your original payment method.`,
+- If we cannot fulfil an order you have paid for, we will contact you to swap it for another piece or add the full amount to your account as exchange credit.`,
   },
   {
     slug: 'privacy',
@@ -467,7 +467,7 @@ You can download all your data from your account (**Data export**) or delete you
 3. **Payment** is processed by Paystack or Bachs. We do not store card details.
 4. **Delivery** times are estimates in working days.
 5. **Exchanges, not refunds.** See our Exchanges policy. Exchange credit has no cash value.
-6. **Unfulfillable orders:** if we cannot supply a piece you have paid for, we refund the amount paid to your original payment method.
+6. **Unfulfillable orders:** if we cannot supply a piece you have paid for, we will offer you another piece or add the full amount paid to your account as exchange credit. We do not issue cash refunds.
 7. These terms are governed by the laws of the Federal Republic of Nigeria.`,
   },
 ];

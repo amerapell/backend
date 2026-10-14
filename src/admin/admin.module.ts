@@ -4,7 +4,6 @@ import { CatalogueModule } from '../catalogue/catalogue.module';
 import { ContentModule } from '../content/content.module';
 import { ExchangesModule } from '../exchanges/exchanges.module';
 import { OrdersModule } from '../orders/orders.module';
-import { PaymentsModule } from '../payments/payments.module';
 import { AdminAuthController } from './auth/admin-auth.controller';
 import { AdminAuthService } from './auth/admin-auth.service';
 import { OtplibTotpService, TOTP } from './auth/totp';
@@ -30,7 +29,7 @@ import {
 import { DISCOUNTS_REPOSITORY, DrizzleDiscountsRepository } from './content/discounts.repository';
 
 @Module({
-  imports: [AuthModule, CatalogueModule, ContentModule, ExchangesModule, OrdersModule, PaymentsModule],
+  imports: [AuthModule, CatalogueModule, ContentModule, ExchangesModule, OrdersModule],
   controllers: [
     AdminAuthController,
     AdminDashboardController,

@@ -72,8 +72,7 @@ export interface PaymentProvider {
   verify(input: VerifyPaymentInput): Promise<VerifyPaymentResult>;
   /** Verifies the signature over the RAW body and normalises the event. Throws WebhookSignatureError. */
   parseWebhook(rawBody: Buffer, headers: WebhookHeaders): ParsedWebhookEvent;
-  /** PAY-7 (admin-only, unfulfillable paid orders). Optional per provider. */
-  refund?(reference: string, amountKobo: number): Promise<void>;
+  // PAY-7: no refund method by design — the store never refunds money; returns are exchange credit only.
 }
 
 export function header(headers: WebhookHeaders, name: string): string | null {

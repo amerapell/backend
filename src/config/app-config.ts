@@ -31,6 +31,8 @@ export interface AppConfigValues {
   cloudinaryApiSecret: string | null;
   sentryDsn: string | null;
   stockHoldMinutes: number;
+  /** OAuth client ID for "Sign in with Google" (ID-token audience). Null → POST /auth/google returns 503. */
+  googleClientId: string | null;
 }
 
 function opt(env: NodeJS.ProcessEnv, key: string): string | null {
@@ -87,6 +89,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfigValue
     cloudinaryApiSecret: opt(env, 'CLOUDINARY_API_SECRET'),
     sentryDsn: opt(env, 'SENTRY_DSN'),
     stockHoldMinutes: 15,
+    googleClientId: opt(env, 'GOOGLE_CLIENT_ID'),
   };
   if (missing.length) {
     throw new Error(`Missing required environment variable${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}. Set ${missing.length > 1 ? 'them' : 'it'} in the Railway service Variables tab.`);

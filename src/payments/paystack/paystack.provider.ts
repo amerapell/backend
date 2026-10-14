@@ -119,8 +119,4 @@ export class PaystackProvider implements PaymentProvider {
       payload: body,
     };
   }
-
-  async refund(reference: string, amountKobo: number): Promise<void> {
-    await this.call('POST', '/refund', { transaction: reference, amount: amountKobo });
-  }
 }

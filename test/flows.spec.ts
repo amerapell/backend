@@ -97,15 +97,17 @@ function harness(settingsOver: Partial<StoredSettings> = {}) {
   const content = { subscribe: async (e: string) => void subscribed.push(e) } as unknown as ContentRepository;
   const saved: unknown[] = [];
   const addresses = { saveIfNew: async (_u: string, a: unknown) => void saved.push(a) } as unknown as AddressesService;
-  const checkout = new CheckoutService(config, clock, carts, credit, zones, content, ordersRepo, ordersView, lifecycle, registry, addresses, settings);
-  const exchanges = new ExchangesService(exchangesRepo, ordersRepo, clock, settings, credit, notifications);
+  // These flows are about checkout/exchanges, not verification: every account counts as email-verified here.
+  const verified = { emailVerified: true, isVerified: async () => verified.emailVerified };
+  const checkout = new CheckoutService(config, clock, carts, credit, zones, content, ordersRepo, ordersView, lifecycle, registry, addresses, settings, verified);
+  const exchanges = new ExchangesService(exchangesRepo, ordersRepo, clock, settings, credit, notifications, verified);
 
   const signed = (payload: unknown) => {
     const raw = Buffer.from(JSON.stringify(payload));
     return { raw, headers: { 'x-paystack-signature': createHmac('sha512', SECRET).update(raw).digest('hex') } };
   };
   return {
-    clock, w, carts, cartRepo, checkout, payments, ordersRepo, creditRepo, credit, exchanges, exchangesRepo, events, email, lifecycle, subscribed, saved, signed,
+    verified, clock, w, carts, cartRepo, checkout, payments, ordersRepo, creditRepo, credit, exchanges, exchangesRepo, events, email, lifecycle, subscribed, saved, signed,
     setVerify: (status: string, amount: number) => (verifyResult = { status, amount }),
   };
 }
@@ -409,5 +411,45 @@ describe('admin order status (ADM-3)', () => {
     await h.lifecycle.adminSetStatus(order.id, 'CANCELLED');
     expect(h.w.stock.get('shirt-l')).toBe(5);
     expect(await h.credit.balance(customer.email)).toBe(1_000_000);
+  });
+});
+
+describe('email verification gates email-keyed credit and exchanges', () => {
+  async function filledCart(h: ReturnType<typeof harness>, userId?: string) {
+    const cart = await h.carts.resolve({ userId }, { create: true });
+    await h.carts.addLine(cart, 'shirt-l', 1);
+    return { token: cart.token, userId };
+  }
+
+  it('an unverified account sees and spends no credit at checkout; verifying unlocks it', async () => {
+    const h = harness();
+    await h.creditRepo.add({ email: customer.email, amountKobo: 6_250_000, reason: 'EXCHANGE_CREDIT' });
+    h.verified.emailVerified = false;
+    const id = await filledCart(h, customer.id);
+    expect(await h.checkout.quote(id, 'LEKKI_AJAH', true, customer)).toMatchObject({ creditAvailableKobo: 0, creditAppliedKobo: 0 });
+    const res = await h.checkout.checkout(id, dto({ useCredit: true }), customer);
+    expect(res.order.creditAppliedKobo).toBe(0);
+    expect(await h.credit.balance(customer.email)).toBe(6_250_000); // untouched
+
+    h.verified.emailVerified = true;
+    const quote = await h.checkout.quote(await filledCart(h, customer.id), 'LEKKI_AJAH', true, customer);
+    expect(quote).toMatchObject({ creditAvailableKobo: 6_250_000, creditAppliedKobo: 6_250_000 });
+  });
+
+  it('guest exchanges placed with the email only show once the account is verified', async () => {
+    const h = harness();
+    const cart = await h.carts.resolve({}, { create: true });
+    await h.carts.addLine(cart, 'shirt-l', 1);
+    const { order } = await h.checkout.checkout({ token: cart.token }, dto());
+    h.setVerify('success', order.amountDueKobo);
+    await h.payments.confirm((await h.ordersRepo.findById(order.id))!);
+    await h.ordersRepo.updateStatus(order.id, 'DELIVERED', { deliveredAt: h.clock.now() });
+    const [line] = await h.ordersRepo.items(order.id);
+    await h.exchanges.request({ orderNumber: order.number, email: customer.email, items: [{ orderItemId: line.id, quantity: 1 }], reason: 'Wrong size' }, undefined);
+
+    h.verified.emailVerified = false;
+    expect(await h.exchanges.forCustomer(customer)).toHaveLength(0);
+    h.verified.emailVerified = true;
+    expect(await h.exchanges.forCustomer(customer)).toHaveLength(1);
   });
 });

@@ -4,7 +4,7 @@ import type { AuthUser } from '../common/auth-types';
 import type { ProductCard } from '../common/contract';
 import { normalizeNigerianPhone } from '../common/phone';
 import { CatalogueService } from '../catalogue/catalogue.service';
-import { CreditService } from '../credit/credit.service';
+import { CreditService, CreditStatement } from '../credit/credit.service';
 import { CREDIT_REPOSITORY, CreditRepository } from '../credit/credit.repository';
 import { OrdersService } from '../orders/orders.service';
 import { ExchangesService } from '../exchanges/exchanges.service';
@@ -39,6 +39,12 @@ export class MeService {
 
   async profile(userId: string): Promise<PublicUser> {
     return this.auth.publicUser(await this.user(userId));
+  }
+
+  /** Credit is keyed by email: hidden (zero, no entries) until the account has verified that email. */
+  async creditStatement(userId: string): Promise<CreditStatement> {
+    const u = await this.user(userId);
+    return u.emailVerifiedAt ? this.credit.statement(u.email) : { balanceKobo: 0, entries: [] };
   }
 
   async updateProfile(userId: string, patch: { firstName?: string; lastName?: string; phone?: string | null; marketingConsent?: boolean }): Promise<PublicUser> {
@@ -83,7 +89,7 @@ export class MeService {
       this.exchanges.forCustomer({ id: u.id, email: u.email, role: 'CUSTOMER' }),
       this.addresses.list(u.id),
       this.repo.wishlistProductIds(u.id),
-      this.credit.statement(u.email),
+      this.creditStatement(u.id),
       this.content.isSubscribed(u.email),
     ]);
     return {

@@ -192,6 +192,37 @@ export interface Exchange {
   createdAt: string;
 }
 
+/** Admin list row: the exchange plus the customer email it belongs to. */
+export interface AdminExchange extends Exchange {
+  email: string;
+}
+
+/** GET /admin/exchanges/:id — everything the admin detail page needs in one call. */
+export interface AdminExchangeDetail extends AdminExchange {
+  orderId: string;
+  orderStatus: OrderStatus;
+  customer: { name: string | null; email: string; phone: string | null; userId: string | null };
+  items: {
+    orderItemId: string;
+    name: string;
+    quantity: number;
+    valueKobo: Money;
+    number: string | null;
+    sku: string | null;
+    colour: string | null;
+    size: string | null;
+    imageUrl: string | null;
+    paidUnitKobo: Money | null;
+  }[];
+  deliveredAt: string | null;
+  exchangeWindowDays: number;
+  /** deliveredAt + exchangeWindowDays (null if the order has no delivery date). */
+  exchangeableUntil: string | null;
+  /** Whether the request was made inside the window. */
+  requestedWithinWindow: boolean;
+  updatedAt: string;
+}
+
 export interface DropSettings {
   title: string;
   collectionSlug: string;

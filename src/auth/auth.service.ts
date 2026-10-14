@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { addMinutes, CLOCK, Clock } from '../common/clock';
 import { randomToken, sha256 } from '../common/ids';
 import { normalizeNigerianPhone } from '../common/phone';
@@ -10,6 +17,8 @@ import { PASSWORD_HASHER, PasswordHasher } from './password-hasher';
 import { TokenService } from './token.service';
 import { USERS_REPOSITORY, UsersRepository } from './users.repository';
 import { RegisterDto } from './auth.dto';
+import { EmailVerificationService } from './email-verification.service';
+import { GOOGLE_ID_TOKEN_VERIFIER, GoogleIdTokenVerifier } from './google-id-token.verifier';
 
 export interface PublicUser {
   id: string;
@@ -17,6 +26,8 @@ export interface PublicUser {
   firstName: string;
   lastName: string;
   phone: string | null;
+  /** False until the customer confirms their email; credit and pre-account guest orders stay hidden until then. */
+  emailVerified: boolean;
   creditBalanceKobo: number;
 }
 
@@ -39,6 +50,8 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly credit: CreditService,
     private readonly notifications: NotificationsService,
+    private readonly verification: EmailVerificationService,
+    @Inject(GOOGLE_ID_TOKEN_VERIFIER) private readonly google: GoogleIdTokenVerifier,
   ) {}
 
   async publicUser(u: UserRow): Promise<PublicUser> {
@@ -48,7 +61,9 @@ export class AuthService {
       firstName: u.firstName,
       lastName: u.lastName,
       phone: u.phone,
-      creditBalanceKobo: await this.credit.balance(u.email),
+      emailVerified: !!u.emailVerifiedAt,
+      // Credit is keyed by email: an account that has not proved it owns the address cannot see it.
+      creditBalanceKobo: u.emailVerifiedAt ? await this.credit.balance(u.email) : 0,
     };
   }
 
@@ -73,6 +88,8 @@ export class AuthService {
       marketingConsent: dto.marketingConsent === true,
     });
     if (dto.marketingConsent === true) await this.content.subscribe(email, true, 'register');
+    // Signed in straight away, but unverified until they click the link in this email.
+    await this.verification.send(user);
     return this.session(user);
   }
 
@@ -99,6 +116,52 @@ export class AuthService {
     return { accessToken: this.tokens.signAccess(user), refresh: { token: rotated.token, expiresAt: rotated.expiresAt } };
   }
 
+  async verifyEmail(token: string): Promise<PublicUser> {
+    return this.publicUser(await this.verification.verify(token));
+  }
+
+  async resendVerification(userId: string): Promise<{ ok: true; sent: boolean }> {
+    return { ok: true, sent: await this.verification.resend(userId) };
+  }
+
+  /**
+   * Sign in with Google: the ID token proves the email, so the account is verified on the way in.
+   * Existing account → linked (googleSub) and logged in; otherwise a CUSTOMER is created with no usable password.
+   */
+  async googleSignIn(credential: string): Promise<AuthResult> {
+    if (!this.google.configured) throw new ServiceUnavailableException('Google sign-in is not configured');
+    const identity = await this.google.verify(credential);
+    if (!identity) throw new UnauthorizedException('Google sign-in failed — please try again');
+    if (!identity.emailVerified) throw new UnauthorizedException('Your Google account email is not verified');
+
+    let user = (await this.users.findByGoogleSub(identity.sub)) ?? (await this.users.findByEmail(identity.email));
+    if (user) {
+      if (user.deletedAt || user.role !== 'CUSTOMER') throw new UnauthorizedException('This account cannot sign in with Google');
+      if (user.googleSub && user.googleSub !== identity.sub) throw new ConflictException('This email is linked to a different Google account');
+      const extra: { googleSub?: string; passwordHash?: string } = {};
+      if (!user.googleSub) extra.googleSub = identity.sub;
+      if (!user.emailVerifiedAt) {
+        // Whoever set this password never proved they own the email — invalidate it (and its sessions)
+        // so a squatter who registered first cannot ride on the Google owner's verification.
+        extra.passwordHash = unusablePasswordHash();
+        await this.users.revokeAllRefreshTokens(user.id, this.clock.now());
+      }
+      user = await this.verification.markVerified(user, extra);
+    } else {
+      user = await this.users.create({
+        email: identity.email,
+        passwordHash: unusablePasswordHash(),
+        firstName: identity.givenName,
+        lastName: identity.familyName,
+        phone: null,
+        marketingConsent: false,
+        googleSub: identity.sub,
+      });
+      user = await this.verification.markVerified(user);
+    }
+    return this.session(user);
+  }
+
   async logout(raw: string | undefined): Promise<void> {
     if (raw) await this.tokens.revoke(raw);
   }
@@ -117,4 +180,9 @@ export class AuthService {
     await this.users.update(userId, { passwordHash: await this.hasher.hash(password) });
     await this.users.revokeAllRefreshTokens(userId, this.clock.now());
   }
+}
+
+/** Not a bcrypt hash, so no password ever matches it; the user can set one via "Forgot password". */
+function unusablePasswordHash(): string {
+  return `!unusable:${randomToken(24)}`;
 }

@@ -78,7 +78,7 @@ export class OrderLifecycleService {
       }
       if (PAID_STATUSES.includes(order.status)) {
         // Store cannot fulfil a paid order: stock goes back; any credit used is returned as credit.
-        // Provider refund for the paid amount is a separate admin action (PAY-7).
+        // PAY-7: no provider refunds — the store never refunds money (exchange credit only).
         await this.repo.restock(order.id);
         await this.credit.reverseOrderSpend(order.id);
       }

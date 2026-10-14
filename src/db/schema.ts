@@ -73,11 +73,15 @@ export const users = pgTable(
     marketingConsent: boolean('marketing_consent').notNull().default(false),
     totpSecret: text('totp_secret'),
     totpEnabled: boolean('totp_enabled').notNull().default(false),
+    /** Null until the customer proves they own `email` (link in the confirmation email, or Google sign-in). */
+    emailVerifiedAt: ts('email_verified_at'),
+    /** Google account subject ("sub" claim) once the user has signed in with Google. */
+    googleSub: text('google_sub'),
     deletedAt: ts('deleted_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [uniqueIndex('users_email_uq').on(t.email)],
+  (t) => [uniqueIndex('users_email_uq').on(t.email), uniqueIndex('users_google_sub_uq').on(t.googleSub)],
 );
 
 export const refreshTokens = pgTable(
@@ -108,6 +112,21 @@ export const passwordResetTokens = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('password_reset_tokens_hash_uq').on(t.tokenHash)],
+);
+
+export const emailVerificationTokens = pgTable(
+  'email_verification_tokens',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: ts('expires_at').notNull(),
+    usedAt: ts('used_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('email_verification_tokens_hash_uq').on(t.tokenHash), index('email_verification_tokens_user_idx').on(t.userId)],
 );
 
 export const addresses = pgTable(

@@ -16,6 +16,7 @@ import {
   orderStatusEmail,
   passwordResetEmail,
   TemplateContext,
+  verifyEmailEmail,
 } from './templates';
 
 /**
@@ -79,6 +80,11 @@ export class NotificationsService {
   async passwordReset(email: string, firstName: string, token: string): Promise<void> {
     const link = `${this.config.values.frontendUrl}/account?view=reset&token=${encodeURIComponent(token)}`;
     await this.deliver(email, passwordResetEmail(firstName, link));
+  }
+
+  async verifyEmail(email: string, firstName: string, token: string): Promise<void> {
+    const link = `${this.config.values.frontendUrl}/account?view=verify&token=${encodeURIComponent(token)}`;
+    await this.deliver(email, verifyEmailEmail(firstName, link));
   }
 
   async contactForm(msg: ContactMessageInput): Promise<void> {

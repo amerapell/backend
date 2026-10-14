@@ -4,7 +4,6 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthUser } from '../common/auth-types';
 import { AddressDto } from '../checkout/checkout.dto';
 import { OrdersService } from '../orders/orders.service';
-import { CreditService } from '../credit/credit.service';
 import { MeService } from './me.service';
 import { AddressesService } from './addresses.service';
 import { UpdateMeDto } from './me.dto';
@@ -16,7 +15,6 @@ export class MeController {
     private readonly me: MeService,
     private readonly addresses: AddressesService,
     private readonly orders: OrdersService,
-    private readonly credit: CreditService,
   ) {}
 
   @Get()
@@ -85,7 +83,7 @@ export class MeController {
 
   @Get('credit')
   myCredit(@CurrentUser() user: AuthUser) {
-    return this.credit.statement(user.email);
+    return this.me.creditStatement(user.id);
   }
 
   @Get('data-export')

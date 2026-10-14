@@ -22,3 +22,12 @@ export class ResetPasswordDto {
   @IsString() @IsNotEmpty() token: string;
   @IsString() @MinLength(8) @MaxLength(128) password: string;
 }
+
+export class VerifyEmailDto {
+  @IsString() @IsNotEmpty() @MaxLength(256) token: string;
+}
+
+export class GoogleSignInDto {
+  /** The Google Identity Services ID token (JWT) from the "Continue with Google" button. */
+  @IsString() @IsNotEmpty() @MaxLength(4096) credential: string;
+}

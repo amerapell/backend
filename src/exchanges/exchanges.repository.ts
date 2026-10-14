@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../db/database.module';
-import { exchangeHistory, exchangeItems, exchanges, orderItems, orders, variants } from '../db/schema';
+import { exchangeHistory, exchangeItems, exchanges, orderItems, orders, users, variants } from '../db/schema';
 import type { ExchangeHistoryRow, ExchangeRow } from '../db/schema';
 import type { ExchangeStatus } from '../common/contract';
 import { formatExchangeNumber } from '../common/ids';
@@ -12,6 +12,8 @@ export const EXCHANGES_REPOSITORY = Symbol('EXCHANGES_REPOSITORY');
 export interface ExchangeAggregate {
   exchange: ExchangeRow;
   orderNumber: string;
+  /** Account holder's name, when the exchange belongs to a signed-up customer. */
+  customerName?: string | null;
   items: { orderItemId: string; name: string; quantity: number; valueKobo: number; variantId: string | null }[];
   history: ExchangeHistoryRow[];
 }
@@ -30,7 +32,8 @@ export interface ExchangesRepository {
   create(input: NewExchange): Promise<string>;
   load(id: string): Promise<ExchangeAggregate | null>;
   loadMany(ids: string[]): Promise<ExchangeAggregate[]>;
-  idsForCustomer(userId: string, email: string): Promise<string[]>;
+  /** `email` null → only exchanges on the account itself (unverified accounts). */
+  idsForCustomer(userId: string, email: string | null): Promise<string[]>;
   idsForAdmin(status?: ExchangeStatus): Promise<string[]>;
   statusesForOrder(orderId: string): Promise<ExchangeStatus[]>;
   /** Quantity of each order item already in a non-declined exchange. */
@@ -78,9 +81,10 @@ export class DrizzleExchangesRepository implements ExchangesRepository {
     if (!ids.length) return [];
     const [rows, items, history] = await Promise.all([
       this.db
-        .select({ exchange: exchanges, orderNumber: orders.number })
+        .select({ exchange: exchanges, orderNumber: orders.number, firstName: users.firstName, lastName: users.lastName })
         .from(exchanges)
         .innerJoin(orders, eq(orders.id, exchanges.orderId))
+        .leftJoin(users, eq(users.id, exchanges.userId))
         .where(inArray(exchanges.id, ids)),
       this.db
         .select({
@@ -103,6 +107,7 @@ export class DrizzleExchangesRepository implements ExchangesRepository {
       .map((r) => ({
         exchange: r.exchange,
         orderNumber: r.orderNumber,
+        customerName: [r.firstName, r.lastName].filter(Boolean).join(' ').trim() || null,
         items: items
           .filter((i) => i.exchangeId === r.exchange.id)
           .map(({ orderItemId, name, quantity, valueKobo, variantId }) => ({ orderItemId, name, quantity, valueKobo, variantId })),
@@ -110,11 +115,11 @@ export class DrizzleExchangesRepository implements ExchangesRepository {
       }));
   }
 
-  async idsForCustomer(userId: string, email: string): Promise<string[]> {
+  async idsForCustomer(userId: string, email: string | null): Promise<string[]> {
     const rows = await this.db
       .select({ id: exchanges.id })
       .from(exchanges)
-      .where(or(eq(exchanges.userId, userId), eq(exchanges.email, email.toLowerCase())))
+      .where(email ? or(eq(exchanges.userId, userId), eq(exchanges.email, email.toLowerCase())) : eq(exchanges.userId, userId))
       .orderBy(desc(exchanges.createdAt));
     return rows.map((r) => r.id);
   }

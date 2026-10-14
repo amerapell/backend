@@ -336,8 +336,8 @@ export class InMemoryExchangesRepository implements ExchangesRepository {
         history: this.history.filter((h) => h.exchangeId === e.id),
       }));
   }
-  async idsForCustomer(userId: string, email: string) {
-    return this.exchanges.filter((e) => e.userId === userId || e.email === email).map((e) => e.id);
+  async idsForCustomer(userId: string, email: string | null) {
+    return this.exchanges.filter((e) => e.userId === userId || (email !== null && e.email === email)).map((e) => e.id);
   }
   async idsForAdmin(status?: ExchangeStatus) {
     return this.exchanges.filter((e) => !status || e.status === status).map((e) => e.id);
