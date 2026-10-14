@@ -1,0 +1,292 @@
+import type { Exchange, Order, StoreSettings } from '../../common/contract';
+import { formatNaira } from '../../common/money';
+import { esc, monoLabel, paragraph, renderLayout, rows, RenderedEmail, rule, toText, BRAND } from './layout';
+
+export interface TemplateContext {
+  frontendUrl: string;
+  settings: Pick<StoreSettings, 'pickupAddress' | 'openingHours' | 'whatsappNumber' | 'contactEmail' | 'contactPhone' | 'exchangeWindowDays'>;
+}
+
+function itemsTable(order: Order): string {
+  const lines = order.items
+    .map(
+      (i) => `<tr>
+<td style="padding:12px 0;border-bottom:1px solid ${BRAND.hair};vertical-align:top;">
+<div style="font-family:${BRAND.mono};font-size:10px;letter-spacing:.06em;color:${BRAND.muted};">${esc(i.number)}</div>
+<div style="font-family:${BRAND.sans};font-size:14px;font-weight:500;color:${BRAND.ink};">${esc(i.name)}</div>
+<div style="font-family:${BRAND.mono};font-size:11px;color:${BRAND.muted};">${esc([i.colour, i.size, `QTY ${i.quantity}`].filter(Boolean).join(' · ').toUpperCase())}</div>
+</td>
+<td align="right" style="padding:12px 0;border-bottom:1px solid ${BRAND.hair};vertical-align:top;font-family:${BRAND.sans};font-size:14px;color:${BRAND.ink};">${formatNaira(i.unitKobo * i.quantity)}</td></tr>`,
+    )
+    .join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-top:1px solid ${BRAND.ink};">${lines}</table>`;
+}
+
+function totals(order: Order): string {
+  const r: [string, string][] = [['Subtotal', formatNaira(order.subtotalKobo)]];
+  if (order.discountKobo) r.push(['Discount', '−' + formatNaira(order.discountKobo)]);
+  r.push([`Delivery · ${order.delivery.name}`, order.deliveryKobo ? formatNaira(order.deliveryKobo) : 'Free']);
+  if (order.creditAppliedKobo) r.push(['Exchange credit', '−' + formatNaira(order.creditAppliedKobo)]);
+  r.push(['Total paid', `<strong style="font-family:${BRAND.serif};font-size:20px;font-weight:400;">${formatNaira(order.amountDueKobo)}</strong>`]);
+  return rows(r);
+}
+
+function addressBlock(order: Order, ctx: TemplateContext): string {
+  if (order.delivery.zone === 'PICKUP') {
+    return paragraph(`${monoLabel('Collect from')}<br>${esc(ctx.settings.pickupAddress)}<br>${esc(ctx.settings.openingHours)}`);
+  }
+  const a = order.delivery.address;
+  if (!a) return '';
+  return paragraph(
+    `${monoLabel('Delivering to')}<br>${esc(a.fullName)} · ${esc(a.phone)}<br>${esc(a.street)}, ${esc(a.area)}<br>${esc(a.lga)}, ${esc(a.state)}${a.landmark ? `<br>Landmark: ${esc(a.landmark)}` : ''}`,
+  );
+}
+
+export function orderConfirmationEmail(order: Order, ctx: TemplateContext): RenderedEmail {
+  const pickup = order.delivery.zone === 'PICKUP';
+  const next = pickup
+    ? 'We will email you as soon as your order is ready to collect. Bring your order number.'
+    : `We are preparing your pieces. You will get an email when your order is dispatched (${order.delivery.name}).`;
+  return {
+    subject: `Order ${order.number} confirmed — Amerapelle`,
+    html: renderLayout({
+      preheader: `Thank you. Order ${order.number} is confirmed.`,
+      eyebrow: `Order ${order.number} · Confirmed`,
+      headlineHtml: 'Thank you. It is <em>yours.</em>',
+      bodyHtml:
+        paragraph(next) +
+        itemsTable(order) +
+        totals(order) +
+        rule() +
+        addressBlock(order, ctx) +
+        paragraph(
+          `Exchange, not refund: unworn pieces with tags can be exchanged for credit within ${ctx.settings.exchangeWindowDays} days of delivery. <a href="${esc(ctx.frontendUrl)}/exchanges" style="color:${BRAND.navy};">Read the policy</a>.`,
+        ),
+      cta: { label: 'View your order', url: `${ctx.frontendUrl}/account/orders/${order.number}` },
+    }),
+    text: toText([
+      `Order ${order.number} confirmed.`,
+      ...order.items.map((i) => `- ${i.name} (${[i.colour, i.size].filter(Boolean).join(', ')}) x${i.quantity} ${formatNaira(i.unitKobo * i.quantity)}`),
+      `Total paid: ${formatNaira(order.amountDueKobo)}`,
+      next,
+    ]),
+  };
+}
+
+export function adminNewOrderEmail(order: Order, ctx: TemplateContext): RenderedEmail {
+  return {
+    subject: `New order ${order.number} · ${formatNaira(order.totalKobo)} · ${order.payment?.provider ?? '—'}`,
+    html: renderLayout({
+      preheader: `New order ${order.number}`,
+      eyebrow: 'Admin · New order',
+      headlineHtml: `${esc(order.number)} — <em>${formatNaira(order.totalKobo)}</em>`,
+      bodyHtml:
+        rows([
+          ['Customer', esc(order.email)],
+          ['Phone', esc(order.phone)],
+          ['Delivery', esc(order.delivery.name)],
+          ['Paid via', esc(order.payment?.provider ?? '—')],
+          ['Reference', esc(order.payment?.reference ?? '—')],
+        ]) +
+        rule() +
+        itemsTable(order) +
+        totals(order) +
+        addressBlock(order, ctx),
+      cta: { label: 'Open in admin', url: `${ctx.frontendUrl}/admin/orders/${order.id}` },
+    }),
+    text: toText([`New order ${order.number}`, `${order.email} ${order.phone}`, `Total ${formatNaira(order.totalKobo)}`]),
+  };
+}
+
+export function orderStatusEmail(order: Order, ctx: TemplateContext): RenderedEmail | null {
+  const url = `${ctx.frontendUrl}/account/orders/${order.number}`;
+  switch (order.status) {
+    case 'DISPATCHED':
+      return {
+        subject: `Order ${order.number} is on its way`,
+        html: renderLayout({
+          preheader: `Your order ${order.number} has been dispatched.`,
+          eyebrow: `Order ${order.number} · Dispatched`,
+          headlineHtml: 'On its <em>way.</em>',
+          bodyHtml:
+            paragraph(`Your order has left the studio. Expected: ${esc(order.delivery.name)}. Our rider will call the number on your order before delivery.`) +
+            itemsTable(order) +
+            addressBlock(order, ctx),
+          cta: { label: 'Track your order', url },
+        }),
+        text: toText([`Order ${order.number} is on its way.`, url]),
+      };
+    case 'READY_FOR_PICKUP':
+      return {
+        subject: `Order ${order.number} is ready to collect`,
+        html: renderLayout({
+          preheader: `Your order ${order.number} is ready for pickup.`,
+          eyebrow: `Order ${order.number} · Ready for pickup`,
+          headlineHtml: 'Ready when <em>you are.</em>',
+          bodyHtml:
+            paragraph('Your pieces are wrapped and waiting. Bring your order number (and ID if someone collects for you).') +
+            rows([
+              ['Store', esc(ctx.settings.pickupAddress)],
+              ['Hours', esc(ctx.settings.openingHours)],
+            ]) +
+            itemsTable(order),
+          cta: { label: 'View order', url },
+        }),
+        text: toText([`Order ${order.number} is ready to collect at ${ctx.settings.pickupAddress}.`, ctx.settings.openingHours]),
+      };
+    case 'DELIVERED':
+      return {
+        subject: `Order ${order.number} delivered`,
+        html: renderLayout({
+          preheader: `Your order ${order.number} has been delivered.`,
+          eyebrow: `Order ${order.number} · Delivered`,
+          headlineHtml: 'Wear it <em>well.</em>',
+          bodyHtml:
+            paragraph('Your order has been delivered. We hope you love it.') +
+            paragraph(
+              `Not quite right? Exchange any unworn piece with its tags for credit until ${order.exchangeableUntil ? esc(new Date(order.exchangeableUntil).toDateString()) : `${ctx.settings.exchangeWindowDays} days after delivery`}. No refunds — exchange credit only.`,
+            ),
+          cta: { label: 'Request an exchange', url },
+        }),
+        text: toText([`Order ${order.number} delivered.`, url]),
+      };
+    default:
+      return null;
+  }
+}
+
+function exchangeItems(ex: Exchange): string {
+  return rows(ex.items.map((i) => [`${i.name} × ${i.quantity}`, formatNaira(i.valueKobo)] as [string, string]));
+}
+
+export function exchangeRequestedAdminEmail(ex: Exchange, customerEmail: string, ctx: TemplateContext): RenderedEmail {
+  return {
+    subject: `Exchange ${ex.number} requested on ${ex.orderNumber}`,
+    html: renderLayout({
+      preheader: `New exchange request ${ex.number}`,
+      eyebrow: 'Admin · Exchange requested',
+      headlineHtml: `${esc(ex.number)} — <em>${esc(ex.reason)}</em>`,
+      bodyHtml:
+        rows([
+          ['Order', esc(ex.orderNumber)],
+          ['Customer', esc(customerEmail)],
+          ['Value', formatNaira(ex.items.reduce((n, i) => n + i.valueKobo, 0))],
+        ]) +
+        rule() +
+        exchangeItems(ex) +
+        (ex.note ? paragraph(`${monoLabel('Note')}<br>${esc(ex.note)}`) : '') +
+        (ex.photoUrls.length ? paragraph(ex.photoUrls.map((u, n) => `<a href="${esc(u)}" style="color:${BRAND.navy};">Photo ${n + 1}</a>`).join(' · ')) : ''),
+      cta: { label: 'Review in admin', url: `${ctx.frontendUrl}/admin/exchanges/${ex.id}` },
+    }),
+    text: toText([`Exchange ${ex.number} requested on ${ex.orderNumber} by ${customerEmail}. Reason: ${ex.reason}`]),
+  };
+}
+
+export function exchangeApprovedEmail(ex: Exchange, ctx: TemplateContext): RenderedEmail {
+  return {
+    subject: `Exchange ${ex.number} approved — how to return your piece`,
+    html: renderLayout({
+      preheader: 'Your exchange is approved. Here is how to return your piece.',
+      eyebrow: `Exchange ${ex.number} · Approved`,
+      headlineHtml: 'Approved. <em>Send it back.</em>',
+      bodyHtml:
+        paragraph('Good news — your exchange request is approved. Please return the piece unworn, with its tags and original packaging, within 7 days.') +
+        exchangeItems(ex) +
+        rule() +
+        paragraph(`${monoLabel('Return to')}<br>${esc(ctx.settings.pickupAddress)}<br>${esc(ctx.settings.openingHours)}`) +
+        paragraph(
+          `Drop it off in person or send it with a rider. Write <strong>${esc(ex.number)}</strong> on the package. Once we receive and check it, the full value is added to your account as exchange credit to spend on something new.`,
+        ) +
+        (ex.history.at(-1)?.note ? paragraph(`${monoLabel('Note from the studio')}<br>${esc(ex.history.at(-1)?.note)}`) : ''),
+      cta: { label: 'Track your exchange', url: `${ctx.frontendUrl}/account/exchanges` },
+    }),
+    text: toText([
+      `Exchange ${ex.number} approved.`,
+      `Return the piece unworn with tags to: ${ctx.settings.pickupAddress} (${ctx.settings.openingHours}). Write ${ex.number} on the package.`,
+    ]),
+  };
+}
+
+export function exchangeDeclinedEmail(ex: Exchange, ctx: TemplateContext): RenderedEmail {
+  const note = ex.history.at(-1)?.note;
+  return {
+    subject: `Exchange ${ex.number} — update on your request`,
+    html: renderLayout({
+      preheader: 'An update on your exchange request.',
+      eyebrow: `Exchange ${ex.number} · Declined`,
+      headlineHtml: 'We could not approve <em>this one.</em>',
+      bodyHtml:
+        paragraph('We are sorry — we are unable to accept this exchange request.') +
+        (note ? paragraph(`${monoLabel('Reason')}<br>${esc(note)}`) : '') +
+        paragraph(`If you think this is a mistake, message us on WhatsApp (${esc(ctx.settings.whatsappNumber)}) with your exchange number.`),
+      cta: { label: 'Read the exchange policy', url: `${ctx.frontendUrl}/exchanges` },
+    }),
+    text: toText([`Exchange ${ex.number} declined.`, note ?? '']),
+  };
+}
+
+export function creditIssuedEmail(ex: Exchange, balanceKobo: number, expiresAt: Date | null, ctx: TemplateContext): RenderedEmail {
+  return {
+    subject: `${formatNaira(ex.creditKobo)} exchange credit added`,
+    html: renderLayout({
+      preheader: `${formatNaira(ex.creditKobo)} has been added to your account.`,
+      eyebrow: `Exchange ${ex.number} · Credit issued`,
+      headlineHtml: `<em>${formatNaira(ex.creditKobo)}</em> to spend.`,
+      bodyHtml:
+        paragraph('We received your piece. The full value is now exchange credit on your account — it is applied automatically at checkout.') +
+        rows([
+          ['Credit added', formatNaira(ex.creditKobo)],
+          ['Balance', formatNaira(balanceKobo)],
+          ['Expires', expiresAt ? esc(expiresAt.toDateString()) : 'Never'],
+        ]) +
+        paragraph('Credit cannot be paid out as cash. If your next order costs more, pay the difference; if less, the rest stays as credit.'),
+      cta: { label: 'Shop new in', url: `${ctx.frontendUrl}/c/new-in` },
+    }),
+    text: toText([`${formatNaira(ex.creditKobo)} exchange credit added. Balance ${formatNaira(balanceKobo)}.`]),
+  };
+}
+
+export function passwordResetEmail(firstName: string, link: string): RenderedEmail {
+  return {
+    subject: 'Reset your Amerapelle password',
+    html: renderLayout({
+      preheader: 'Reset your password — link valid for 1 hour.',
+      eyebrow: 'Account · Password reset',
+      headlineHtml: 'A new <em>password.</em>',
+      bodyHtml:
+        paragraph(`Hi ${esc(firstName || 'there')}, we received a request to reset your password. The link below is valid for 1 hour.`) +
+        paragraph('If you did not ask for this, you can ignore this email — your password will not change.'),
+      cta: { label: 'Reset password', url: link },
+    }),
+    text: toText(['Reset your Amerapelle password (valid 1 hour):', link]),
+  };
+}
+
+export interface ContactMessageInput {
+  name: string;
+  email: string;
+  phone?: string | null;
+  subject: string;
+  message: string;
+}
+
+export function contactFormEmail(msg: ContactMessageInput): RenderedEmail {
+  return {
+    subject: `Contact form: ${msg.subject}`,
+    html: renderLayout({
+      preheader: `Message from ${msg.name}`,
+      eyebrow: 'Admin · Contact form',
+      headlineHtml: esc(msg.subject),
+      bodyHtml:
+        rows([
+          ['Name', esc(msg.name)],
+          ['Email', esc(msg.email)],
+          ['Phone', esc(msg.phone ?? '—')],
+        ]) +
+        rule() +
+        paragraph(esc(msg.message).replace(/\n/g, '<br>')),
+      footerNote: 'Reply to this email to answer the customer directly.',
+    }),
+    text: toText([`From: ${msg.name} <${msg.email}> ${msg.phone ?? ''}`, `Subject: ${msg.subject}`, '', msg.message]),
+  };
+}
