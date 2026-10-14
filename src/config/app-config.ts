@@ -39,10 +39,11 @@ function opt(env: NodeJS.ProcessEnv, key: string): string | null {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfigValues {
   const nodeEnv = env.NODE_ENV ?? 'development';
   const isProd = nodeEnv === 'production';
+  const missing: string[] = [];
   const required = (key: string, devFallback: string): string => {
     const v = opt(env, key);
     if (v) return v;
-    if (isProd) throw new Error(`Missing required environment variable ${key}`);
+    if (isProd) missing.push(key);
     return devFallback;
   };
   const bachsApiKey = opt(env, 'BACHS_API_KEY');
@@ -54,7 +55,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfigValue
         ? 'live'
         : 'sandbox';
   const frontendUrl = required('FRONTEND_URL', 'http://localhost:3000').replace(/\/+$/, '');
-  return {
+  const config: AppConfigValues = {
     nodeEnv,
     port: Number(env.PORT ?? 4000),
     databaseUrl: required('DATABASE_URL', 'postgres://postgres:postgres@localhost:5432/amerapelle'),
@@ -84,6 +85,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfigValue
     sentryDsn: opt(env, 'SENTRY_DSN'),
     stockHoldMinutes: 15,
   };
+  if (missing.length) {
+    throw new Error(`Missing required environment variable${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}. Set ${missing.length > 1 ? 'them' : 'it'} in the Railway service Variables tab.`);
+  }
+  return config;
 }
 
 /** Injectable wrapper so services depend on a class token, not process.env. */
