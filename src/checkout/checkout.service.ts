@@ -190,10 +190,8 @@ export class CheckoutService {
     } catch (err) {
       this.logger.error(`Payment init failed for ${order.number}: ${(err as Error).message}`);
       await this.lifecycle.cancelUnpaid({ ...order, paymentReference: reference }, 'FAILED');
-      if (err instanceof PaymentProviderError) {
-        throw new BadGatewayException(`${provider.displayName} could not start the payment. Please try again or choose another method.`);
-      }
-      throw err;
+      // Provider rejected the request, timed out or was unreachable: the order is already cancelled and stock released.
+      throw new BadGatewayException(`${provider.displayName} could not start the payment. Please try again or choose another method.`);
     }
   }
 

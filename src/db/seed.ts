@@ -26,6 +26,17 @@ async function main(): Promise<void> {
   const now = new Date();
   const log = (m: string) => console.log(`[seed] ${m}`);
 
+  // `--if-empty` (used on Railway start): only seed a brand-new database, so admin deletions are never undone.
+  if (process.argv.includes('--if-empty')) {
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(schema.collections);
+    if (count > 0) {
+      log(`database already has ${count} collections — skipping (--if-empty)`);
+      await pool.end();
+      return;
+    }
+    log('empty database — loading starter data');
+  }
+
   // ---------------------------------------------------------------- admin
   if (config.adminEmail && config.adminPassword) {
     const [existing] = await db.select().from(schema.users).where(eq(schema.users.email, config.adminEmail)).limit(1);

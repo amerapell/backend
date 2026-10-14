@@ -20,4 +20,4 @@ COPY --from=build --chown=app:app /app/drizzle ./drizzle
 USER app
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD wget -qO- "http://127.0.0.1:${PORT:-4000}/api/v1/health" || exit 1
-CMD ["sh", "-c", "npm run migrate && npm run start:prod"]
+CMD ["sh", "-c", "npm run migrate && (npm run seed -- --if-empty || echo '[seed] skipped after error') && npm run start:prod"]
