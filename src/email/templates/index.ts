@@ -60,7 +60,7 @@ export function orderConfirmationEmail(order: Order, ctx: TemplateContext): Rend
         rule() +
         addressBlock(order, ctx) +
         paragraph(
-          `Exchange, not refund: unworn pieces with tags can be exchanged for credit within ${ctx.settings.exchangeWindowDays} days of delivery. <a href="${esc(ctx.frontendUrl)}/exchanges" style="color:${BRAND.navy};">Read the policy</a>.`,
+          `Exchange, not refund: unworn pieces with tags can be exchanged for credit within ${ctx.settings.exchangeWindowDays} days of delivery. <a href="${esc(ctx.frontendUrl)}/policies/exchanges" style="color:${BRAND.navy};">Read the policy</a>.`,
         ),
       cta: { label: 'View your order', url: `${ctx.frontendUrl}/account/orders/${order.number}` },
     }),
@@ -176,7 +176,7 @@ export function exchangeRequestedAdminEmail(ex: Exchange, customerEmail: string,
         exchangeItems(ex) +
         (ex.note ? paragraph(`${monoLabel('Note')}<br>${esc(ex.note)}`) : '') +
         (ex.photoUrls.length ? paragraph(ex.photoUrls.map((u, n) => `<a href="${esc(u)}" style="color:${BRAND.navy};">Photo ${n + 1}</a>`).join(' · ')) : ''),
-      cta: { label: 'Review in admin', url: `${ctx.frontendUrl}/admin/exchanges/${ex.id}` },
+      cta: { label: 'Review in admin', url: `${ctx.frontendUrl}/admin/exchanges` },
     }),
     text: toText([`Exchange ${ex.number} requested on ${ex.orderNumber} by ${customerEmail}. Reason: ${ex.reason}`]),
   };
@@ -219,7 +219,7 @@ export function exchangeDeclinedEmail(ex: Exchange, ctx: TemplateContext): Rende
         paragraph('We are sorry — we are unable to accept this exchange request.') +
         (note ? paragraph(`${monoLabel('Reason')}<br>${esc(note)}`) : '') +
         paragraph(`If you think this is a mistake, message us on WhatsApp (${esc(ctx.settings.whatsappNumber)}) with your exchange number.`),
-      cta: { label: 'Read the exchange policy', url: `${ctx.frontendUrl}/exchanges` },
+      cta: { label: 'Read the exchange policy', url: `${ctx.frontendUrl}/policies/exchanges` },
     }),
     text: toText([`Exchange ${ex.number} declined.`, note ?? '']),
   };

@@ -12,12 +12,13 @@ import { NotificationsService } from './notifications.service';
       provide: EMAIL_SENDER,
       inject: [AppConfig],
       useFactory: (config: AppConfig): EmailSender => {
-        const { resendApiKey, mailDomain } = config.values;
+        const { resendApiKey, mailFrom } = config.values;
         if (!resendApiKey) {
           new Logger('EmailModule').warn('RESEND_API_KEY not set — emails will be logged, not sent');
           return new ConsoleEmailSender();
         }
-        return new ResendEmailSender(resendApiKey, `Amerapelle <orders@${mailDomain}>`);
+        new Logger('EmailModule').log(`Sending email via Resend from ${mailFrom}`);
+        return new ResendEmailSender(resendApiKey, mailFrom);
       },
     },
     NotificationsService,

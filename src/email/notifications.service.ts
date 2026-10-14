@@ -77,7 +77,7 @@ export class NotificationsService {
   }
 
   async passwordReset(email: string, firstName: string, token: string): Promise<void> {
-    const link = `${this.config.values.frontendUrl}/account/reset-password?token=${encodeURIComponent(token)}`;
+    const link = `${this.config.values.frontendUrl}/account?view=reset&token=${encodeURIComponent(token)}`;
     await this.deliver(email, passwordResetEmail(firstName, link));
   }
 

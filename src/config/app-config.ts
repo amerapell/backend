@@ -21,6 +21,8 @@ export interface AppConfigValues {
   bachsCheckoutMode: 'product' | 'pricing';
   resendApiKey: string | null;
   mailDomain: string;
+  /** Full From header; overrides `Amerapelle <orders@MAIL_DOMAIN>` (e.g. `Amerapelle <onboarding@resend.dev>` before the domain is verified). */
+  mailFrom: string;
   adminEmail: string | null;
   adminPassword: string | null;
   adminNotifyEmail: string | null;
@@ -76,6 +78,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfigValue
     bachsCheckoutMode: opt(env, 'BACHS_CHECKOUT_MODE') === 'pricing' ? 'pricing' : 'product',
     resendApiKey: opt(env, 'RESEND_API_KEY'),
     mailDomain: opt(env, 'MAIL_DOMAIN') ?? 'amerapelle.com',
+    mailFrom: opt(env, 'MAIL_FROM') ?? `Amerapelle <orders@${opt(env, 'MAIL_DOMAIN') ?? 'amerapelle.com'}>`,
     adminEmail: opt(env, 'ADMIN_EMAIL')?.toLowerCase() ?? null,
     adminPassword: opt(env, 'ADMIN_PASSWORD'),
     adminNotifyEmail: opt(env, 'ADMIN_NOTIFY_EMAIL') ?? opt(env, 'ADMIN_EMAIL'),
