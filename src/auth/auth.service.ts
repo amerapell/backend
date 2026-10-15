@@ -102,8 +102,15 @@ export class AuthService {
   }
 
   async login(email: string, password: string): Promise<AuthResult> {
+    // Account created with Google (or whose unverified password was retired by a Google sign-in):
+    // there is no password to check, so say how to get in instead of "incorrect password".
+    const existing = await this.users.findByEmail(email);
+    if (existing && !existing.deletedAt && isUnusablePasswordHash(existing.passwordHash)) {
+      throw new UnauthorizedException(GOOGLE_ONLY_MESSAGE);
+    }
     const user = await this.validateCredentials(email, password);
-    if (user.role !== 'CUSTOMER') throw new UnauthorizedException('Incorrect email or password');
+    // Only after the password is proven: the store's admin login is separate (it needs the 2-step code).
+    if (user.role !== 'CUSTOMER') throw new UnauthorizedException(ADMIN_ACCOUNT_MESSAGE);
     return this.session(user);
   }
 
@@ -136,7 +143,8 @@ export class AuthService {
 
     let user = (await this.users.findByGoogleSub(identity.sub)) ?? (await this.users.findByEmail(identity.email));
     if (user) {
-      if (user.deletedAt || user.role !== 'CUSTOMER') throw new UnauthorizedException('This account cannot sign in with Google');
+      if (user.deletedAt) throw new UnauthorizedException('This account has been deleted');
+      if (user.role !== 'CUSTOMER') throw new UnauthorizedException(ADMIN_ACCOUNT_MESSAGE);
       if (user.googleSub && user.googleSub !== identity.sub) throw new ConflictException('This email is linked to a different Google account');
       const extra: { googleSub?: string; passwordHash?: string } = {};
       if (!user.googleSub) extra.googleSub = identity.sub;
@@ -183,6 +191,15 @@ export class AuthService {
 }
 
 /** Not a bcrypt hash, so no password ever matches it; the user can set one via "Forgot password". */
+const UNUSABLE_PREFIX = '!unusable:';
 function unusablePasswordHash(): string {
-  return `!unusable:${randomToken(24)}`;
+  return `${UNUSABLE_PREFIX}${randomToken(24)}`;
 }
+function isUnusablePasswordHash(hash: string | null | undefined): boolean {
+  return !hash || hash.startsWith(UNUSABLE_PREFIX);
+}
+
+export const GOOGLE_ONLY_MESSAGE =
+  'This account signs in with Google. Use "Continue with Google", or choose "Forgot your password?" to set a password for it.';
+export const ADMIN_ACCOUNT_MESSAGE =
+  "This email belongs to the store's admin account. Sign in at /admin, or use a different email to shop.";

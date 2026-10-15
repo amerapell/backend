@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createId } from '@paralleldrive/cuid2';
-import { AuthService } from '../src/auth/auth.service';
+import { ADMIN_ACCOUNT_MESSAGE, AuthService, GOOGLE_ONLY_MESSAGE } from '../src/auth/auth.service';
 import { EmailVerificationService, INVALID_VERIFICATION_LINK } from '../src/auth/email-verification.service';
 import type { GoogleIdentity, GoogleIdTokenVerifier } from '../src/auth/google-id-token.verifier';
 import type { PasswordHasher } from '../src/auth/password-hasher';
@@ -73,9 +73,15 @@ class InMemoryUsersRepository implements UsersRepository {
   async revokeAllRefreshTokens(userId: string) {
     this.revokedFor.push(userId);
   }
-  async saveResetToken() {}
-  async consumeResetToken() {
-    return null;
+  reset: TokenRecord[] = [];
+  async saveResetToken(userId: string, tokenHash: string, expiresAt: Date) {
+    this.reset.push({ userId, tokenHash, expiresAt, usedAt: null, createdAt: this.clock.now() });
+  }
+  async consumeResetToken(tokenHash: string, now: Date) {
+    const t = this.reset.find((v) => v.tokenHash === tokenHash && !v.usedAt && v.expiresAt > now);
+    if (!t) return null;
+    t.usedAt = now;
+    return t.userId;
   }
   async saveVerificationToken(userId: string, tokenHash: string, expiresAt: Date) {
     this.verification.push({ userId, tokenHash, expiresAt, usedAt: null, createdAt: this.clock.now() });
@@ -134,7 +140,13 @@ function harness(opts: { googleConfigured?: boolean } = {}) {
     const m = /view=verify&token=([^\s&]+)/.exec(text);
     return m ? decodeURIComponent(m[1]) : null;
   };
-  return { clock, users, email, verification, auth, creditRepo, claimed, google, lastLinkToken };
+  /** The raw token from the last password-reset email's link. */
+  const lastResetToken = () => {
+    const text = email.sent.at(-1)?.text ?? '';
+    const m = /view=reset&token=([^\s&]+)/.exec(text);
+    return m ? decodeURIComponent(m[1]) : null;
+  };
+  return { clock, users, email, verification, auth, creditRepo, claimed, google, lastLinkToken, lastResetToken };
 }
 
 const registration = { email: 'Ada@Example.com', password: 'Passw0rd!x', firstName: 'Ada', lastName: 'Obi', marketingConsent: false };
@@ -258,5 +270,58 @@ describe('Google sign-in', () => {
     await h.users.create({ email: 'boss@example.com', passwordHash: 'x', firstName: 'B', lastName: 'A', phone: null, marketingConsent: false, role: 'ADMIN' });
     h.google.identities.set('admin', identity({ sub: 'g-admin', email: 'boss@example.com' }));
     await expect(h.auth.googleSignIn('admin')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+});
+
+describe('email + Google sign-in stay on one account', () => {
+  const identity = (over: Partial<GoogleIdentity> = {}): GoogleIdentity => ({
+    sub: 'g-123', email: 'ada@example.com', emailVerified: true, givenName: 'Ada', familyName: 'Obi', ...over,
+  });
+  const setPasswordByEmail = async (h: ReturnType<typeof harness>, address: string, password: string) => {
+    await h.auth.forgotPassword(address);
+    const token = h.lastResetToken();
+    expect(token).toBeTruthy();
+    await h.auth.resetPassword(token!, password);
+  };
+
+  it('Google first: password sign-in explains it is a Google account; "Forgot password" adds one and both then work', async () => {
+    const h = harness();
+    h.google.identities.set('cred', identity());
+    const first = await h.auth.googleSignIn('cred');
+    await expect(h.auth.login('ada@example.com', 'anything')).rejects.toThrow(GOOGLE_ONLY_MESSAGE);
+    await setPasswordByEmail(h, 'ADA@example.com', 'N3wPassw0rd!');
+    expect((await h.auth.login('Ada@Example.com', 'N3wPassw0rd!')).user.id).toBe(first.user.id);
+    expect((await h.auth.googleSignIn('cred')).user.id).toBe(first.user.id);
+    expect(h.users.users).toHaveLength(1);
+  });
+
+  it('email first (confirmed): Google links to the same account and the password keeps working', async () => {
+    const h = harness();
+    const { user } = await h.auth.register(registration);
+    await h.auth.verifyEmail(h.lastLinkToken()!);
+    h.google.identities.set('cred', identity());
+    expect((await h.auth.googleSignIn('cred')).user.id).toBe(user.id);
+    expect((await h.auth.login('ada@example.com', registration.password)).user.id).toBe(user.id);
+    expect(h.users.users).toHaveLength(1);
+  });
+
+  it('email first (never confirmed): Google takes over safely, then the owner can set a password again', async () => {
+    const h = harness();
+    const { user } = await h.auth.register(registration);
+    h.google.identities.set('cred', identity());
+    expect((await h.auth.googleSignIn('cred')).user.id).toBe(user.id);
+    await expect(h.auth.login('ada@example.com', registration.password)).rejects.toThrow(GOOGLE_ONLY_MESSAGE);
+    await setPasswordByEmail(h, 'ada@example.com', 'N3wPassw0rd!');
+    expect((await h.auth.login('ada@example.com', 'N3wPassw0rd!')).user.id).toBe(user.id);
+    expect((await h.auth.googleSignIn('cred')).user.id).toBe(user.id);
+  });
+
+  it('the admin email gets a clear pointer to /admin (only once the password is right) — never a customer session', async () => {
+    const h = harness();
+    await h.users.create({ email: 'boss@example.com', passwordHash: 'hashed:Adm1nPass!', firstName: 'B', lastName: 'A', phone: null, marketingConsent: false, role: 'ADMIN' });
+    await expect(h.auth.login('boss@example.com', 'wrong')).rejects.toThrow('Incorrect email or password');
+    await expect(h.auth.login('boss@example.com', 'Adm1nPass!')).rejects.toThrow(ADMIN_ACCOUNT_MESSAGE);
+    h.google.identities.set('admin', identity({ sub: 'g-admin', email: 'boss@example.com' }));
+    await expect(h.auth.googleSignIn('admin')).rejects.toThrow(ADMIN_ACCOUNT_MESSAGE);
   });
 });
