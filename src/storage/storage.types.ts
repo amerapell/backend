@@ -29,4 +29,4 @@ export interface ImageUploader {
 }
 
 /** How the admin browser should upload: straight to Cloudinary (signed) or to our API (`POST /admin/uploads/image`). */
-export type UploadMode = { mode: 'cloudinary' } & SignedUploadParams | { mode: 'direct' };
+export type UploadMode = ({ mode: 'cloudinary' } & SignedUploadParams | { mode: 'direct' }) & { backgroundRemoval?: boolean };

@@ -8,7 +8,7 @@ export const VARIANT_WIDTHS = [480, 960, 1600] as const;
 const WEBP_QUALITY = 76;
 const WEBP_EFFORT = 4;
 /** Guard against decompression bombs (~ 12k × 12k). */
-const MAX_INPUT_PIXELS = 150_000_000;
+export const MAX_INPUT_PIXELS = 150_000_000;
 
 export interface ProcessedVariant {
   width: number;

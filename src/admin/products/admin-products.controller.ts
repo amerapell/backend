@@ -3,6 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import type { ProductStatus } from '../../common/contract';
 import { parsePage } from '../../common/pagination';
+import { BackgroundRemover, CutoutLayout } from '../../storage/background-remover';
 import { MAX_UPLOAD_BYTES } from '../../storage/image-processor';
 import { IMAGE_UPLOADER, ImageUploader, STORAGE_SIGNER, StorageSigner, UploadMode } from '../../storage/storage.types';
 import { AdminController } from '../admin-controller.decorator';
@@ -80,6 +81,7 @@ export class AdminUploadsController {
   constructor(
     @Inject(STORAGE_SIGNER) private readonly signer: StorageSigner,
     @Inject(IMAGE_UPLOADER) private readonly uploader: ImageUploader,
+    private readonly remover: BackgroundRemover,
   ) {}
 
   /**
@@ -89,18 +91,35 @@ export class AdminUploadsController {
   @Post('sign')
   @HttpCode(200)
   sign(): UploadMode {
-    if (!this.signer.isConfigured()) return { mode: 'direct' };
-    return { mode: 'cloudinary', ...this.signer.signUpload('amerapelle/products') };
+    if (!this.signer.isConfigured()) return { mode: 'direct', backgroundRemoval: this.remover.isAvailable() };
+    return { mode: 'cloudinary', ...this.signer.signUpload('amerapelle/products'), backgroundRemoval: this.remover.isAvailable() };
   }
 
-  /** Server-side product image upload (multipart field `file`) → `{ url, width, height }`. */
+  /**
+   * Server-side product image upload (multipart field `file`) → `{ url, width, height }`.
+   * `removeBackground=true` stores the cut-out on the stage ground instead (`layout` portrait 4:5 | landscape 3:2);
+   * add `keepOriginal=true` to also store the untouched photo → `originalUrl`.
+   */
   @Post('image')
   @HttpCode(201)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES + 1, files: 1 } }))
-  async image(@UploadedFile() file: Express.Multer.File | undefined) {
+  async image(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('removeBackground') removeBackground?: string,
+    @Body('layout') layout?: string,
+    @Body('keepOriginal') keepOriginal?: string,
+  ) {
     if (!file) throw new BadRequestException('Attach an image as "file"');
-    const { url, width, height } = await this.uploader.upload(file, 'amerapelle/products');
-    return { url, width: width ?? null, height: height ?? null };
+    if (removeBackground !== 'true') {
+      const { url, width, height } = await this.uploader.upload(file, 'amerapelle/products');
+      return { url, width: width ?? null, height: height ?? null };
+    }
+    const shape: CutoutLayout = layout === 'landscape' ? 'landscape' : 'portrait';
+    const cut = await this.remover.cutout(file.buffer, shape);
+    const base = (file.originalname || 'photo').replace(/\.\w+$/, '');
+    const stored = await this.uploader.upload({ buffer: cut, mimetype: 'image/jpeg', originalname: `${base}-cutout.jpg` }, 'amerapelle/products');
+    const original = keepOriginal === 'true' ? await this.uploader.upload(file, 'amerapelle/products') : null;
+    return { url: stored.url, width: stored.width ?? null, height: stored.height ?? null, originalUrl: original?.url ?? null };
   }
 }
 

@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import sharp from 'sharp';
+import { BackgroundRemover } from '../src/storage/background-remover';
 import { AdminUploadsController } from '../src/admin/products/admin-products.controller';
 import { CloudinaryStorage } from '../src/storage/cloudinary.service';
 import { DatabaseImageStorage, ownerKindForFolder } from '../src/storage/database-image.storage';
@@ -189,19 +190,43 @@ describe('media delivery', () => {
 
 describe('AdminUploadsController', () => {
   const uploader: ImageUploader = { isConfigured: () => true, upload: async () => ({ url: 'https://api.test/api/v1/media/abc', width: 960, height: 1200 }) };
+  const noRemover = { isAvailable: () => false, cutout: async () => Buffer.alloc(0) } as unknown as BackgroundRemover;
 
   it('sign → { mode: direct } without Cloudinary keys, { mode: cloudinary, …signed } with them', () => {
-    const none = new AdminUploadsController(new CloudinaryStorage(testConfig()), uploader);
-    expect(none.sign()).toEqual({ mode: 'direct' });
+    const none = new AdminUploadsController(new CloudinaryStorage(testConfig()), uploader, noRemover);
+    expect(none.sign()).toEqual({ mode: 'direct', backgroundRemoval: false });
     const cfg = testConfig({ CLOUDINARY_CLOUD_NAME: 'demo', CLOUDINARY_API_KEY: 'k', CLOUDINARY_API_SECRET: 's' });
-    const signed = new AdminUploadsController(new CloudinaryStorage(cfg), uploader).sign();
+    const signed = new AdminUploadsController(new CloudinaryStorage(cfg), uploader, noRemover).sign();
     expect(signed).toMatchObject({ mode: 'cloudinary', cloudName: 'demo', apiKey: 'k', folder: 'amerapelle/products' });
     expect(signed.mode === 'cloudinary' && typeof signed.signature).toBe('string');
   });
 
   it('image → { url, width, height }; 400 without a file', async () => {
-    const ctrl = new AdminUploadsController(new CloudinaryStorage(testConfig()), uploader);
+    const ctrl = new AdminUploadsController(new CloudinaryStorage(testConfig()), uploader, noRemover);
     await expect(ctrl.image({ buffer: Buffer.from('x'), mimetype: 'image/jpeg' } as Express.Multer.File)).resolves.toEqual({ url: 'https://api.test/api/v1/media/abc', width: 960, height: 1200 });
     await expect(ctrl.image(undefined)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('removeBackground=true stores the cut-out (and the original when keepOriginal=true)', async () => {
+    const stored: { name?: string; mime: string }[] = [];
+    let n = 0;
+    const recording: ImageUploader = {
+      isConfigured: () => true,
+      upload: async (f) => {
+        stored.push({ name: f.originalname, mime: f.mimetype });
+        return { url: `https://api.test/api/v1/media/m${++n}`, width: 1600, height: 2000 };
+      },
+    };
+    const layouts: string[] = [];
+    const remover = { isAvailable: () => true, cutout: async (_b: Buffer, layout: string) => (layouts.push(layout), Buffer.from('cut')) } as unknown as BackgroundRemover;
+    const ctrl = new AdminUploadsController(new CloudinaryStorage(testConfig()), recording, remover);
+    expect(ctrl.sign()).toEqual({ mode: 'direct', backgroundRemoval: true });
+    const file = { buffer: Buffer.from('x'), mimetype: 'image/png', originalname: 'look.png' } as Express.Multer.File;
+    await expect(ctrl.image(file, 'true', 'landscape', 'true')).resolves.toEqual({ url: 'https://api.test/api/v1/media/m1', width: 1600, height: 2000, originalUrl: 'https://api.test/api/v1/media/m2' });
+    expect(layouts).toEqual(['landscape']);
+    expect(stored).toEqual([{ name: 'look-cutout.jpg', mime: 'image/jpeg' }, { name: 'look.png', mime: 'image/png' }]);
+    const one = await ctrl.image(file, 'true');
+    expect(one.originalUrl).toBeNull();
+    expect(layouts[1]).toBe('portrait');
   });
 });

@@ -251,7 +251,15 @@ export interface StoreSettings {
   creditExpiryDays: number | null;
   freeDeliveryThresholdKobo: Money | null;
   tickerText: string[];
+  /** Home "Amerapelle at your service" card photos; null → plain ground with the icon. */
+  serviceImages: ServiceImages;
   drop: DropSettings | null;
+}
+
+export interface ServiceImages {
+  stylist: string | null;
+  store: string | null;
+  exchange: string | null;
 }
 
 export interface Quote {

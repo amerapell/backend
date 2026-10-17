@@ -1,4 +1,5 @@
 import { Global, Logger, Module } from '@nestjs/common';
+import { BackgroundRemover } from './background-remover';
 import { CloudinaryStorage } from './cloudinary.service';
 import { DatabaseImageStorage } from './database-image.storage';
 import { ImageProcessor } from './image-processor';
@@ -13,6 +14,7 @@ import { IMAGE_UPLOADER, STORAGE_SIGNER } from './storage.types';
   providers: [
     CloudinaryStorage,
     ImageProcessor,
+    { provide: BackgroundRemover, useFactory: () => new BackgroundRemover() },
     DatabaseImageStorage,
     { provide: MEDIA_REPOSITORY, useClass: DrizzleMediaRepository },
     // Signing is Cloudinary-only; callers check isConfigured() and fall back to direct upload.
@@ -24,6 +26,6 @@ import { IMAGE_UPLOADER, STORAGE_SIGNER } from './storage.types';
       useFactory: (cloudinary: CloudinaryStorage, builtIn: DatabaseImageStorage) => selectImageUploader(cloudinary, builtIn, new Logger('Storage')),
     },
   ],
-  exports: [STORAGE_SIGNER, IMAGE_UPLOADER, MEDIA_REPOSITORY],
+  exports: [STORAGE_SIGNER, IMAGE_UPLOADER, MEDIA_REPOSITORY, BackgroundRemover],
 })
 export class StorageModule {}

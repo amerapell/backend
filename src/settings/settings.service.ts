@@ -32,8 +32,16 @@ export class SettingsService {
     const current = await this.get();
     const next: StoredSettings = { ...current };
     for (const [k, v] of Object.entries(patch) as [keyof StoredSettings, unknown][]) {
-      if (v === undefined || k === 'drop') continue;
+      if (v === undefined || k === 'drop' || k === 'serviceImages') continue;
       (next as unknown as Record<string, unknown>)[k] = v;
+    }
+    if (patch.serviceImages) {
+      const cur = next.serviceImages ?? DEFAULT_SETTINGS.serviceImages;
+      next.serviceImages = {
+        stylist: patch.serviceImages.stylist !== undefined ? patch.serviceImages.stylist || null : cur.stylist,
+        store: patch.serviceImages.store !== undefined ? patch.serviceImages.store || null : cur.store,
+        exchange: patch.serviceImages.exchange !== undefined ? patch.serviceImages.exchange || null : cur.exchange,
+      };
     }
     if (patch.drop !== undefined) {
       next.drop = patch.drop
