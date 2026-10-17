@@ -29,6 +29,11 @@ export interface AppConfigValues {
   cloudinaryCloudName: string | null;
   cloudinaryApiKey: string | null;
   cloudinaryApiSecret: string | null;
+  /**
+   * Public absolute origin of this API (no trailing slash), used to build built-in media URLs
+   * (`${publicApiUrl}/api/v1/media/:id`). PUBLIC_API_URL → https://RAILWAY_PUBLIC_DOMAIN → http://localhost:PORT.
+   */
+  publicApiUrl: string;
   sentryDsn: string | null;
   stockHoldMinutes: number;
   /** OAuth client ID for "Sign in with Google" (ID-token audience). Null → POST /auth/google returns 503. */
@@ -38,6 +43,14 @@ export interface AppConfigValues {
 function opt(env: NodeJS.ProcessEnv, key: string): string | null {
   const v = env[key];
   return v && v.trim() !== '' ? v.trim() : null;
+}
+
+function resolvePublicApiUrl(env: NodeJS.ProcessEnv): string {
+  const explicit = opt(env, 'PUBLIC_API_URL');
+  if (explicit) return explicit.replace(/\/+$/, '').replace(/\/api\/v1$/, '');
+  const railway = opt(env, 'RAILWAY_PUBLIC_DOMAIN');
+  if (railway) return `https://${railway.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`;
+  return `http://localhost:${Number(env.PORT ?? 4000)}`;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfigValues {
@@ -87,6 +100,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfigValue
     cloudinaryCloudName: opt(env, 'CLOUDINARY_CLOUD_NAME'),
     cloudinaryApiKey: opt(env, 'CLOUDINARY_API_KEY'),
     cloudinaryApiSecret: opt(env, 'CLOUDINARY_API_SECRET'),
+    publicApiUrl: resolvePublicApiUrl(env),
     sentryDsn: opt(env, 'SENTRY_DSN'),
     stockHoldMinutes: 15,
     googleClientId: opt(env, 'GOOGLE_CLIENT_ID'),

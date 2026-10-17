@@ -3,7 +3,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import type { ProductStatus } from '../../common/contract';
 import { parsePage } from '../../common/pagination';
-import { STORAGE_SIGNER, StorageSigner } from '../../storage/storage.types';
+import { MAX_UPLOAD_BYTES } from '../../storage/image-processor';
+import { IMAGE_UPLOADER, ImageUploader, STORAGE_SIGNER, StorageSigner, UploadMode } from '../../storage/storage.types';
 import { AdminController } from '../admin-controller.decorator';
 import { AdminProductsService } from './admin-products.service';
 import { CollectionDto, CreateProductDto, UpdateCollectionDto, UpdateProductDto, UpdateVariantDto } from './admin-products.dto';
@@ -76,13 +77,30 @@ export class AdminStockController {
 
 @AdminController('uploads')
 export class AdminUploadsController {
-  constructor(@Inject(STORAGE_SIGNER) private readonly signer: StorageSigner) {}
+  constructor(
+    @Inject(STORAGE_SIGNER) private readonly signer: StorageSigner,
+    @Inject(IMAGE_UPLOADER) private readonly uploader: ImageUploader,
+  ) {}
 
-  /** Cloudinary signed params for direct browser upload into amerapelle/products. */
+  /**
+   * How the browser should upload a product image. Cloudinary configured → `{ mode: 'cloudinary', ...signed params }`
+   * for a direct browser→Cloudinary upload into amerapelle/products; otherwise `{ mode: 'direct' }` → POST /admin/uploads/image.
+   */
   @Post('sign')
   @HttpCode(200)
-  sign() {
-    return this.signer.signUpload('amerapelle/products');
+  sign(): UploadMode {
+    if (!this.signer.isConfigured()) return { mode: 'direct' };
+    return { mode: 'cloudinary', ...this.signer.signUpload('amerapelle/products') };
+  }
+
+  /** Server-side product image upload (multipart field `file`) → `{ url, width, height }`. */
+  @Post('image')
+  @HttpCode(201)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES + 1, files: 1 } }))
+  async image(@UploadedFile() file: Express.Multer.File | undefined) {
+    if (!file) throw new BadRequestException('Attach an image as "file"');
+    const { url, width, height } = await this.uploader.upload(file, 'amerapelle/products');
+    return { url, width: width ?? null, height: height ?? null };
   }
 }
 

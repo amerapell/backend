@@ -57,6 +57,8 @@ export interface ProductCard {
   images: { url: string; alt: string }[];
   colours: Colour[];
   inStock: boolean;
+  /** Admin flag: shown as the wide featured piece in listing grids. */
+  featured: boolean;
 }
 
 export interface Variant {
@@ -94,6 +96,9 @@ export interface Collection {
   isDrop: boolean;
   goLiveAt: string | null;
   heroPattern: 'ADIRE' | 'ASOOKE' | null;
+  heroImageUrl: string | null;
+  homeOrder: number | null;
+  tagline: string | null;
 }
 
 export interface CartLine {

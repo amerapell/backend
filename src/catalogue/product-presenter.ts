@@ -102,6 +102,7 @@ export function toProductCard(agg: ProductAggregate, now: Date): ProductCard {
       .map((i) => ({ url: i.url, alt: i.alt || p.name })),
     colours: productColours(agg),
     inStock: totalAvailable(agg) > 0,
+    featured: p.featured,
   };
 }
 
@@ -160,5 +161,8 @@ export function toCollection(c: CollectionRow, count: number): Collection {
     isDrop: c.isDrop,
     goLiveAt: c.goLiveAt ? c.goLiveAt.toISOString() : null,
     heroPattern: c.heroPattern ?? null,
+    heroImageUrl: c.heroImageUrl ?? null,
+    homeOrder: c.homeOrder ?? null,
+    tagline: c.tagline ?? null,
   };
 }

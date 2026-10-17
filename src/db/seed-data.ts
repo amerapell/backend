@@ -21,13 +21,19 @@ export interface SeedCollection {
   heroPattern?: 'ADIRE' | 'ASOOKE' | null;
   exchangeable?: boolean;
   sortOrder: number;
+  /** Design v3 §8: home hero panel order (drop first, then 1..4). */
+  homeOrder?: number | null;
+  heroImageUrl?: string | null;
+  tagline?: string | null;
 }
 
+const heroImage = (label: string) => `https://placehold.co/1600x1000/cecdcb/000000/png?text=${encodeURIComponent(label)}`;
+
 export const COLLECTIONS: SeedCollection[] = [
-  { slug: 'women', name: 'Women', description: "Tailoring, silk and leather for evenings in Lagos. Every piece is a limited run; when it's gone, it's gone.", heroPattern: 'ADIRE', sortOrder: 1 },
-  { slug: 'men', name: 'Men', description: 'Tailoring, knitwear, leather.', sortOrder: 2 },
-  { slug: 'bags-accessories', name: 'Bags & Accessories', description: 'Structured leather, cut to carry a Lagos day into the night.', heroPattern: 'ASOOKE', sortOrder: 3 },
-  { slug: 'shoes', name: 'Shoes', description: 'Nappa and calf leather, sized EU.', sortOrder: 4 },
+  { slug: 'women', name: 'Women', description: "Tailoring, silk and leather for evenings in Lagos. Every piece is a limited run; when it's gone, it's gone.", heroPattern: 'ADIRE', sortOrder: 1, homeOrder: 1, heroImageUrl: heroImage('Women') },
+  { slug: 'men', name: 'Men', description: 'Tailoring, knitwear, leather.', sortOrder: 2, homeOrder: 2, heroImageUrl: heroImage('Men') },
+  { slug: 'bags-accessories', name: 'Bags & Accessories', description: 'Structured leather, cut to carry a Lagos day into the night.', heroPattern: 'ASOOKE', sortOrder: 3, homeOrder: 3, heroImageUrl: heroImage('Bags & Accessories') },
+  { slug: 'shoes', name: 'Shoes', description: 'Nappa and calf leather, sized EU.', sortOrder: 4, homeOrder: 4, heroImageUrl: heroImage('Shoes') },
   { slug: 'new-in', name: 'New In', description: 'This week at the studio.', sortOrder: 5 },
   { slug: 'sale', name: 'Sale', description: 'Last pieces, quietly reduced.', sortOrder: 6 },
   {
@@ -37,6 +43,9 @@ export const COLLECTIONS: SeedCollection[] = [
     isDrop: true,
     heroPattern: 'ADIRE',
     sortOrder: 0,
+    homeOrder: 0,
+    heroImageUrl: heroImage('Drop 04'),
+    tagline: 'Discover the drop',
   },
   { slug: 'jewellery', name: 'Jewellery', description: 'Finishing pieces. For hygiene reasons jewellery is not exchangeable.', exchangeable: false, sortOrder: 7 },
 ];

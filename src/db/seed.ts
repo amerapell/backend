@@ -74,6 +74,9 @@ async function main(): Promise<void> {
         heroPattern: c.heroPattern ?? null,
         exchangeable: c.exchangeable ?? true,
         sortOrder: c.sortOrder,
+        homeOrder: c.homeOrder ?? null,
+        heroImageUrl: c.heroImageUrl ?? null,
+        tagline: c.tagline ?? null,
       })
       .onConflictDoNothing({ target: schema.collections.slug });
   }
@@ -171,7 +174,7 @@ async function main(): Promise<void> {
       ...DEFAULT_SETTINGS,
       pickupAddress: process.env.SEED_STORE_ADDRESS ?? '[Store address], Victoria Island, Lagos',
       contactEmail: config.adminNotifyEmail ?? DEFAULT_SETTINGS.contactEmail,
-      drop: { title: 'Drop 04 — The Night Edit', collectionSlug: DROP_SLUG, goLiveAt: dropGoLive.toISOString(), firstRunTotal: 48 },
+      drop: { title: 'The Night Edit', collectionSlug: DROP_SLUG, goLiveAt: dropGoLive.toISOString(), firstRunTotal: 48 },
     };
     await db.insert(schema.storeSettings).values({ id: 'default', data: settings });
     log('settings created');

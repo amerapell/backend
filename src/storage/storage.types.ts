@@ -15,8 +15,18 @@ export interface StorageSigner {
   signUpload(folder: string): SignedUploadParams;
 }
 
-/** Server-side upload (customer exchange photos). */
+export interface UploadedImage {
+  url: string;
+  /** Pixel size of the stored (largest) image, when the backend reports it. */
+  width?: number;
+  height?: number;
+}
+
+/** Server-side upload (customer exchange photos, admin direct uploads). */
 export interface ImageUploader {
   isConfigured(): boolean;
-  upload(file: { buffer: Buffer; mimetype: string; originalname?: string }, folder: string): Promise<{ url: string }>;
+  upload(file: { buffer: Buffer; mimetype: string; originalname?: string }, folder: string): Promise<UploadedImage>;
 }
+
+/** How the admin browser should upload: straight to Cloudinary (signed) or to our API (`POST /admin/uploads/image`). */
+export type UploadMode = { mode: 'cloudinary' } & SignedUploadParams | { mode: 'direct' };

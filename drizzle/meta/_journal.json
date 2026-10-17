@@ -22,6 +22,27 @@
       "when": 1791991164823,
       "tag": "0002_email_verification_google",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792085693934,
+      "tag": "0003_media_storage",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792132256902,
+      "tag": "0004_featured_stock_notify",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792149629949,
+      "tag": "0005_collection_hero",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { AppConfig } from '../config/app-config';
 import { signCloudinaryParams } from './cloudinary-signature';
-import type { ImageUploader, SignedUploadParams, StorageSigner } from './storage.types';
+import type { ImageUploader, SignedUploadParams, StorageSigner, UploadedImage } from './storage.types';
 
 @Injectable()
 export class CloudinaryStorage implements StorageSigner, ImageUploader {
@@ -30,14 +30,14 @@ export class CloudinaryStorage implements StorageSigner, ImageUploader {
     return { cloudName: v.cloudinaryCloudName as string, apiKey: v.cloudinaryApiKey as string, timestamp, signature, folder };
   }
 
-  upload(file: { buffer: Buffer; mimetype: string }, folder: string): Promise<{ url: string }> {
+  upload(file: { buffer: Buffer; mimetype: string }, folder: string): Promise<UploadedImage> {
     this.assertConfigured();
     return new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         { folder, resource_type: 'image' },
         (err?: unknown, res?: UploadApiResponse) => {
           if (err || !res) return reject(err instanceof Error ? err : new Error('Upload failed'));
-          resolve({ url: res.secure_url });
+          resolve({ url: res.secure_url, width: res.width, height: res.height });
         },
       );
       stream.end(file.buffer);

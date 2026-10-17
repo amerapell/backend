@@ -17,7 +17,8 @@ export const DEFAULT_SETTINGS: StoredSettings = {
   exchangeWindowDays: 7,
   creditExpiryDays: null,
   freeDeliveryThresholdKobo: 30000000,
-  tickerText: ['DROP 04 — THE NIGHT EDIT', 'NOW LIVE', 'DELIVERY ACROSS NIGERIA', 'PAY WITH PAYSTACK OR BACHS', 'EXCHANGE, NOT REFUND', 'LAGOS'],
+  // Design v3 §3: one sentence-case line in the promo bar (only the first message is shown).
+  tickerText: ['Discover Drop 04 — The Night Edit', 'Delivery across Nigeria', 'Exchange, never a refund'],
   drop: null,
 };
 

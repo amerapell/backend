@@ -16,6 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import type { ProductStatus, SizeGuide } from '../../common/contract';
+import { IMAGE_URL_OPTIONS } from '../../common/validation';
 
 export class ColourDto {
   @IsString() @IsNotEmpty() @MaxLength(40) name: string;
@@ -23,7 +24,7 @@ export class ColourDto {
 }
 
 export class ImageDto {
-  @IsUrl({ protocols: ['https', 'http'], require_protocol: true }) url: string;
+  @IsUrl(IMAGE_URL_OPTIONS) url: string;
   @IsString() @MaxLength(200) alt: string;
   @IsOptional() @IsString() @MaxLength(40) colour?: string | null;
 }
@@ -38,6 +39,7 @@ export class CreateProductDto {
   @IsOptional() @IsString() @MaxLength(120) material?: string | null;
   @IsIn(['CLOTHING', 'SHOES', 'NONE']) sizeGuide: SizeGuide;
   @IsBoolean() exchangeable: boolean;
+  @IsOptional() @IsBoolean() featured?: boolean;
   @IsIn(['DRAFT', 'LIVE', 'ARCHIVED']) status: ProductStatus;
   @IsArray() @IsString({ each: true }) collectionIds: string[];
   @IsArray() @ArrayMaxSize(12) @ValidateNested({ each: true }) @Type(() => ColourDto) colours: ColourDto[];
@@ -62,6 +64,7 @@ export class UpdateProductDto {
   @IsOptional() @IsString() @MaxLength(120) material?: string | null;
   @IsOptional() @IsIn(['CLOTHING', 'SHOES', 'NONE']) sizeGuide?: SizeGuide;
   @IsOptional() @IsBoolean() exchangeable?: boolean;
+  @IsOptional() @IsBoolean() featured?: boolean;
   @IsOptional() @IsIn(['DRAFT', 'LIVE', 'ARCHIVED']) status?: ProductStatus;
   @IsOptional() @IsArray() @IsString({ each: true }) collectionIds?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(12) @ValidateNested({ each: true }) @Type(() => ColourDto) colours?: ColourDto[];
@@ -91,6 +94,9 @@ export class CollectionDto {
   @IsOptional() @IsIn(['ADIRE', 'ASOOKE', null]) heroPattern?: 'ADIRE' | 'ASOOKE' | null;
   @IsOptional() @IsBoolean() exchangeable?: boolean;
   @IsOptional() @IsInt() sortOrder?: number;
+  @IsOptional() @IsString() @MaxLength(2000) heroImageUrl?: string | null;
+  @IsOptional() @IsInt() @Min(0) @Max(1000) homeOrder?: number | null;
+  @IsOptional() @IsString() @MaxLength(80) tagline?: string | null;
 }
 
 export class UpdateCollectionDto {
@@ -102,4 +108,7 @@ export class UpdateCollectionDto {
   @IsOptional() @IsIn(['ADIRE', 'ASOOKE', null]) heroPattern?: 'ADIRE' | 'ASOOKE' | null;
   @IsOptional() @IsBoolean() exchangeable?: boolean;
   @IsOptional() @IsInt() sortOrder?: number;
+  @IsOptional() @IsString() @MaxLength(2000) heroImageUrl?: string | null;
+  @IsOptional() @IsInt() @Min(0) @Max(1000) homeOrder?: number | null;
+  @IsOptional() @IsString() @MaxLength(80) tagline?: string | null;
 }

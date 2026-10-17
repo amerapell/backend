@@ -1,10 +1,15 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CatalogueService } from './catalogue.service';
 import { parseListQuery } from './catalogue.query';
+import { StockNotifyDto, StockNotifyService } from './stock-notify';
 
 @Controller()
 export class CatalogueController {
-  constructor(private readonly catalogue: CatalogueService) {}
+  constructor(
+    private readonly catalogue: CatalogueService,
+    private readonly stockNotify: StockNotifyService,
+  ) {}
 
   @Get('collections')
   collections() {
@@ -25,6 +30,14 @@ export class CatalogueController {
   @Get('products/:slug')
   product(@Param('slug') slug: string) {
     return this.catalogue.getProduct(slug);
+  }
+
+  /** "Notify me" when a sold-out size comes back. */
+  @Post('products/:slug/notify')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  notify(@Param('slug') slug: string, @Body() dto: StockNotifyDto) {
+    return this.stockNotify.subscribe(slug, dto.email, dto.variantId);
   }
 
   @Get('search/suggest')

@@ -1,6 +1,9 @@
 import { diffVariantMatrix, generateVariantMatrix, skuFor } from '../src/catalogue/variant-matrix';
 import { computeBadge, isExchangeable, isScheduled, ProductAggregate, toProductCard, variantImageUrls } from '../src/catalogue/product-presenter';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { sortSizes } from '../src/catalogue/catalogue.repository';
+import type { CatalogueRepository } from '../src/catalogue/catalogue.repository';
+import { StockNotifyService } from '../src/catalogue/stock-notify';
 import type { CollectionRow, ProductImageRow, ProductRow } from '../src/db/schema';
 
 const black = { name: 'Black', hex: '#16161a' };
@@ -62,6 +65,7 @@ const product = (over: Partial<ProductRow> = {}): ProductRow => ({
   care: null,
   sizeGuide: 'CLOTHING',
   exchangeable: true,
+  featured: false,
   status: 'LIVE',
   options: { colours: [black], sizes: ['S', 'M'] },
   basePriceKobo: 18_500_000,
@@ -98,6 +102,9 @@ const collection = (slug: string, over: Partial<CollectionRow> = {}): Collection
   isDrop: false,
   goLiveAt: null,
   heroPattern: null,
+  heroImageUrl: null,
+  homeOrder: null,
+  tagline: null,
   exchangeable: true,
   sortOrder: 0,
   createdAt: new Date(),
@@ -150,5 +157,32 @@ describe('product badges (CAT-2)', () => {
   });
   it('sorts sizes sensibly', () => {
     expect(sortSizes(['XL', 'S', 'EU 40', 'M', 'EU 38', 'XS'])).toEqual(['XS', 'S', 'M', 'XL', 'EU 38', 'EU 40']);
+  });
+});
+
+describe('featured piece + stock notify', () => {
+  it('exposes the admin featured flag on cards', () => {
+    expect(toProductCard(agg(), now).featured).toBe(false);
+    expect(toProductCard(agg({ product: product({ featured: true }) }), now).featured).toBe(true);
+  });
+
+  const setup = (a: ProductAggregate | null) => {
+    const added: { email: string; productId: string; variantId: string }[] = [];
+    const catalogue = {
+      findProductIdBySlug: async (slug: string) => (a && slug === a.product.slug ? a.product.id : null),
+      loadAggregates: async () => (a ? [a] : []),
+    } as unknown as CatalogueRepository;
+    const svc = new StockNotifyService(catalogue, { add: async (e) => void added.push(e) }, { now: () => now });
+    return { svc, added };
+  };
+  it('stores a normalised sign-up for a variant of the product', async () => {
+    const { svc, added } = setup(agg());
+    await expect(svc.subscribe('cropped-leather-jacket', ' Ada@Example.com ', 'b')).resolves.toEqual({ ok: true });
+    expect(added).toEqual([{ email: 'ada@example.com', productId: 'p1', variantId: 'b' }]);
+  });
+  it('rejects unknown products and variants', async () => {
+    await expect(setup(agg()).svc.subscribe('nope', 'a@b.co', 'a')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(setup(agg()).svc.subscribe('cropped-leather-jacket', 'a@b.co', 'zzz')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(setup(agg({ product: product({ status: 'DRAFT' }) })).svc.subscribe('cropped-leather-jacket', 'a@b.co', 'a')).rejects.toBeInstanceOf(NotFoundException);
   });
 });

@@ -1,5 +1,6 @@
 import {
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -162,6 +163,12 @@ export const collections = pgTable(
     isDrop: boolean('is_drop').notNull().default(false),
     goLiveAt: ts('go_live_at'),
     heroPattern: heroPatternEnum('hero_pattern'),
+    /** Design v3 §8: full-bleed photo for the home hero panel + mega menu feature. */
+    heroImageUrl: text('hero_image_url'),
+    /** Design v3 §8: home hero panel order (ascending); null = not on the home page. */
+    homeOrder: integer('home_order'),
+    /** Design v3 §8: short hero link label override ("Discover the collection"). */
+    tagline: text('tagline'),
     exchangeable: boolean('exchangeable').notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: createdAt(),
@@ -188,6 +195,8 @@ export const products = pgTable(
     care: text('care'),
     sizeGuide: sizeGuideEnum('size_guide').notNull().default('NONE'),
     exchangeable: boolean('exchangeable').notNull().default(true),
+    /** Shown as the wide "featured piece" in listing grids. */
+    featured: boolean('featured').notNull().default(false),
     status: productStatusEnum('status').notNull().default('DRAFT'),
     options: jsonb('options').$type<ProductOptions>().notNull().default({ colours: [], sizes: [] }),
     basePriceKobo: integer('base_price_kobo').notNull(),
@@ -585,6 +594,24 @@ export const dropNotifications = pgTable(
   (t) => [uniqueIndex('drop_notifications_uq').on(t.contact, t.collectionSlug)],
 );
 
+/** "Notify me" sign-ups for a sold-out size (variant) on the product page. */
+export const stockNotifications = pgTable(
+  'stock_notifications',
+  {
+    id: id(),
+    email: text('email').notNull(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    variantId: text('variant_id')
+      .notNull()
+      .references(() => variants.id, { onDelete: 'cascade' }),
+    notifiedAt: ts('notified_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('stock_notifications_uq').on(t.email, t.variantId), index('stock_notifications_variant_idx').on(t.variantId)],
+);
+
 export const contactMessages = pgTable('contact_messages', {
   id: id(),
   name: text('name').notNull(),
@@ -594,6 +621,42 @@ export const contactMessages = pgTable('contact_messages', {
   message: text('message').notNull(),
   createdAt: createdAt(),
 });
+
+/* ------------------------------------------------------------------ media (built-in image storage) */
+
+/** Postgres `bytea` ⇄ Node Buffer. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea',
+});
+
+/** An uploaded image when Cloudinary is not configured. Bytes live in media_variants (WebP, several widths). */
+export const mediaFiles = pgTable(
+  'media_files',
+  {
+    id: id(),
+    /** What the image belongs to: 'product' | 'exchange'. */
+    ownerKind: text('owner_kind').notNull(),
+    originalFilename: text('original_filename'),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('media_files_owner_kind_idx').on(t.ownerKind, t.createdAt)],
+);
+
+export const mediaVariants = pgTable(
+  'media_variants',
+  {
+    mediaId: text('media_id')
+      .notNull()
+      .references(() => mediaFiles.id, { onDelete: 'cascade' }),
+    width: integer('width').notNull(),
+    mime: text('mime').notNull(),
+    bytes: bytea('bytes').notNull(),
+    byteSize: integer('byte_size').notNull(),
+  },
+  (t) => [uniqueIndex('media_variants_media_width_uq').on(t.mediaId, t.width)],
+);
 
 /* ------------------------------------------------------------------ inferred row types */
 
@@ -615,3 +678,5 @@ export type CreditLedgerRow = typeof creditLedger.$inferSelect;
 export type FaqItemRow = typeof faqItems.$inferSelect;
 export type PageRow = typeof pages.$inferSelect;
 export type AddressRow = typeof addresses.$inferSelect;
+export type MediaFileRow = typeof mediaFiles.$inferSelect;
+export type MediaVariantRow = typeof mediaVariants.$inferSelect;

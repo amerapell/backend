@@ -131,6 +131,7 @@ export class AdminProductsService {
       care: dto.care ?? null,
       sizeGuide: dto.sizeGuide,
       exchangeable: dto.exchangeable,
+      featured: dto.featured ?? false,
       status: dto.status,
       options: { colours: dto.colours, sizes: dto.sizes },
       basePriceKobo: dto.basePriceKobo,
@@ -163,6 +164,7 @@ export class AdminProductsService {
     assign('care', dto.care);
     assign('sizeGuide', dto.sizeGuide);
     assign('exchangeable', dto.exchangeable);
+    assign('featured', dto.featured);
     assign('status', dto.status);
     assign('lowStockThreshold', dto.lowStockThreshold);
     assign('seoTitle', dto.seoTitle);
@@ -278,6 +280,9 @@ export class AdminProductsService {
       heroPattern: dto.heroPattern ?? null,
       exchangeable: dto.exchangeable ?? true,
       sortOrder: dto.sortOrder ?? 0,
+      heroImageUrl: cleanText(dto.heroImageUrl),
+      homeOrder: dto.homeOrder ?? null,
+      tagline: cleanText(dto.tagline),
     });
     this.settings.invalidate();
     return { ...toCollection(c, 0), exchangeable: c.exchangeable, sortOrder: c.sortOrder };
@@ -300,6 +305,9 @@ export class AdminProductsService {
     if (dto.heroPattern !== undefined) patch.heroPattern = dto.heroPattern;
     if (dto.exchangeable !== undefined) patch.exchangeable = dto.exchangeable;
     if (dto.sortOrder !== undefined) patch.sortOrder = dto.sortOrder;
+    if (dto.heroImageUrl !== undefined) patch.heroImageUrl = cleanText(dto.heroImageUrl);
+    if (dto.homeOrder !== undefined) patch.homeOrder = dto.homeOrder;
+    if (dto.tagline !== undefined) patch.tagline = cleanText(dto.tagline);
     const c = await this.repo.updateCollection(id, patch);
     if (!c) throw new NotFoundException('Collection not found');
     return { ...toCollection(c, 0), exchangeable: c.exchangeable, sortOrder: c.sortOrder };
@@ -309,4 +317,11 @@ export class AdminProductsService {
     if (!(await this.repo.deleteCollection(id))) throw new NotFoundException('Collection not found');
     return { ok: true };
   }
+}
+
+/** Trims optional text; empty → null (design v3 collection hero fields). */
+export function cleanText(v: string | null | undefined): string | null {
+  if (v == null) return null;
+  const t = v.trim();
+  return t ? t : null;
 }
