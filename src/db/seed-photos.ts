@@ -9,8 +9,8 @@
  */
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { and, eq, isNull, like, or } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { and, eq, isNull, like, or, sql } from 'drizzle-orm';
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { loadConfig } from '../config/app-config';
 import { slugify } from '../common/ids';
 import { nairaToKobo } from '../common/money';
@@ -23,6 +23,7 @@ import * as schema from './schema';
 import { DROP_SLUG } from './seed-data';
 
 const MARKER_ID = 'seed:placeholder-photos-v1';
+const HIDE_MARKER_ID = 'seed:hide-photoless-v1';
 const DAY = 86_400_000;
 const CLOTHING = ['XS', 'S', 'M', 'L', 'XL'];
 const MENS = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -141,6 +142,7 @@ async function main(): Promise<void> {
   const [marker] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, MARKER_ID)).limit(1);
   if (marker && !force) {
     log('already loaded — skipping');
+    await hidePhotoless(db, log);
     await pool.end();
     return;
   }
@@ -233,8 +235,39 @@ async function main(): Promise<void> {
     .insert(schema.storeSettings)
     .values({ id: MARKER_ID, data: { appliedAt: new Date().toISOString() } })
     .onConflictDoUpdate({ target: schema.storeSettings.id, set: { data: { appliedAt: new Date().toISOString() } } });
+  await hidePhotoless(db, log);
   await pool.end();
   log('done');
+}
+
+/**
+ * Once per database: starter products that only have grey placehold.co images move to DRAFT (off the shop, still in
+ * admin — add photos and set them LIVE again), and placehold.co banner images are cleared so empty panels are hidden.
+ */
+async function hidePhotoless(db: NodePgDatabase<typeof schema>, log: (m: string) => void): Promise<void> {
+  const [done] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, HIDE_MARKER_ID)).limit(1);
+  if (done) return;
+  const drafted = await db
+    .update(schema.products)
+    .set({ status: 'DRAFT', updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.products.status, 'LIVE'),
+        sql`not exists (select 1 from product_images pi where pi.product_id = ${schema.products.id} and pi.url not like '%placehold.co%')`,
+      ),
+    )
+    .returning({ name: schema.products.name });
+  const cleared = await db
+    .update(schema.collections)
+    .set({ heroImageUrl: null })
+    .where(like(schema.collections.heroImageUrl, '%placehold.co%'))
+    .returning({ slug: schema.collections.slug });
+  await db
+    .insert(schema.storeSettings)
+    .values({ id: HIDE_MARKER_ID, data: { appliedAt: new Date().toISOString(), drafted: drafted.map((d) => d.name) } })
+    .onConflictDoNothing({ target: schema.storeSettings.id });
+  log(`products without photos moved to draft: ${drafted.length}${drafted.length ? ` (${drafted.map((d) => d.name).join(', ')})` : ''}`);
+  log(`placeholder banner images cleared: ${cleared.length}`);
 }
 
 if (require.main === module) {
