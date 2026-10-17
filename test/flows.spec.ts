@@ -322,7 +322,7 @@ describe('exchanges (EXC-1..8)', () => {
 
     const approved = await h.exchanges.approve(ex.id, 'Bring it by Friday');
     expect(approved.status).toBe('APPROVED');
-    expect(h.email.sent.at(-1)?.html).toContain('[Store address]');
+    expect(h.email.sent.at(-1)?.html).toContain('Novare Mall');
 
     const stockBefore = h.w.stock.get('shirt-l')!;
     const received = await h.exchanges.receive(ex.id);

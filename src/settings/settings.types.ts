@@ -5,13 +5,13 @@ export type StoredSettings = Omit<StoreSettings, 'drop'> & { drop: Omit<DropSett
 
 export const DEFAULT_SETTINGS: StoredSettings = {
   storeName: 'Amerapelle',
-  pickupAddress: '[Store address], Victoria Island, Lagos',
-  openingHours: 'Mon–Sat 10:00–19:00 · Sun 12:00–17:00',
-  whatsappNumber: '+2348000000000',
+  pickupAddress: 'Shop N01, Novare Mall, Sangotedo, Lagos',
+  openingHours: 'Mon–Sat 9am–9pm · Sun 12pm–9pm',
+  whatsappNumber: '+2349046762972',
   instagramUrl: 'https://instagram.com/amerapelle',
   tiktokUrl: 'https://tiktok.com/@amerapelle',
   contactEmail: 'hello@amerapelle.com',
-  contactPhone: '+2348000000000',
+  contactPhone: '+234 904 676 2972',
   paystackEnabled: true,
   bachsEnabled: true,
   exchangeWindowDays: 7,

@@ -172,7 +172,7 @@ async function main(): Promise<void> {
   if (!settingsRow) {
     const settings: StoredSettings = {
       ...DEFAULT_SETTINGS,
-      pickupAddress: process.env.SEED_STORE_ADDRESS ?? '[Store address], Victoria Island, Lagos',
+      pickupAddress: process.env.SEED_STORE_ADDRESS ?? 'Shop N01, Novare Mall, Sangotedo, Lagos',
       contactEmail: config.adminNotifyEmail ?? DEFAULT_SETTINGS.contactEmail,
       drop: { title: 'The Night Edit', collectionSlug: DROP_SLUG, goLiveAt: dropGoLive.toISOString(), firstRunTotal: 48 },
     };

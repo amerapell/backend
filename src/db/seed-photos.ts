@@ -25,6 +25,7 @@ import { DROP_SLUG } from './seed-data';
 const MARKER_ID = 'seed:placeholder-photos-v1';
 const HIDE_MARKER_ID = 'seed:hide-photoless-v1';
 const SIMPLIFY_MARKER_ID = 'seed:simplify-v1';
+const STORE_DETAILS_MARKER_ID = 'seed:store-details-v1';
 const DAY = 86_400_000;
 const CLOTHING = ['XS', 'S', 'M', 'L', 'XL'];
 const MENS = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -145,6 +146,7 @@ async function main(): Promise<void> {
     log('already loaded — skipping');
     await hidePhotoless(db, log);
     await simplify(db, log);
+    await storeDetails(db, log);
     await pool.end();
     return;
   }
@@ -239,6 +241,7 @@ async function main(): Promise<void> {
     .onConflictDoUpdate({ target: schema.storeSettings.id, set: { data: { appliedAt: new Date().toISOString() } } });
   await hidePhotoless(db, log);
   await simplify(db, log);
+  await storeDetails(db, log);
   await pool.end();
   log('done');
 }
@@ -304,6 +307,28 @@ async function simplify(db: NodePgDatabase<typeof schema>, log: (m: string) => v
     .values({ id: SIMPLIFY_MARKER_ID, data: { appliedAt: new Date().toISOString() } })
     .onConflictDoNothing({ target: schema.storeSettings.id });
   log(`simplified: drop off (${drops.map((d) => d.slug).join(', ') || 'none'}), WELCOME10 off, Bachs off, top bar reset`);
+}
+
+/** Once per database: the real store details from the client (still editable in admin → Settings). */
+async function storeDetails(db: NodePgDatabase<typeof schema>, log: (m: string) => void): Promise<void> {
+  const [done] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, STORE_DETAILS_MARKER_ID)).limit(1);
+  if (done) return;
+  const [row] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, 'default')).limit(1);
+  if (row) {
+    const data = {
+      ...(row.data as Record<string, unknown>),
+      pickupAddress: 'Shop N01, Novare Mall, Sangotedo, Lagos',
+      openingHours: 'Mon–Sat 9am–9pm · Sun 12pm–9pm',
+      whatsappNumber: '+2349046762972',
+      contactPhone: '+234 904 676 2972',
+    };
+    await db.update(schema.storeSettings).set({ data, updatedAt: new Date() }).where(eq(schema.storeSettings.id, 'default'));
+  }
+  await db
+    .insert(schema.storeSettings)
+    .values({ id: STORE_DETAILS_MARKER_ID, data: { appliedAt: new Date().toISOString() } })
+    .onConflictDoNothing({ target: schema.storeSettings.id });
+  log('store details set: Novare Mall, Sangotedo');
 }
 
 if (require.main === module) {
