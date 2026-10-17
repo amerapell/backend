@@ -63,6 +63,13 @@ export class ServiceImagesDto {
   @IsOptional() @IsString() @MaxLength(2000) exchange?: string | null;
 }
 
+export class WelcomePopupDto {
+  @IsOptional() @IsBoolean() enabled?: boolean;
+  @IsOptional() @IsString() @MaxLength(80) title?: string;
+  @IsOptional() @IsString() @MaxLength(300) text?: string;
+  @IsOptional() @IsString() @MaxLength(2000) imageUrl?: string | null;
+}
+
 export class UpdateSettingsDto {
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(80) storeName?: string;
   @IsOptional() @IsString() @MaxLength(300) pickupAddress?: string;
@@ -79,6 +86,7 @@ export class UpdateSettingsDto {
   @IsOptional() @IsInt() @Min(0) freeDeliveryThresholdKobo?: number | null;
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(80, { each: true }) tickerText?: string[];
   @IsOptional() @ValidateNested() @Type(() => ServiceImagesDto) serviceImages?: ServiceImagesDto;
+  @IsOptional() @ValidateNested() @Type(() => WelcomePopupDto) welcomePopup?: WelcomePopupDto;
   @IsOptional() @ValidateNested() @Type(() => DropDto) drop?: DropDto | null;
 }
 

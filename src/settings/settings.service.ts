@@ -14,6 +14,7 @@ export class SettingsService {
     if (this.cache && Date.now() - this.cache.at < CACHE_MS) return this.cache.value;
     const stored = await this.repo.load();
     const value: StoredSettings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+    value.welcomePopup = { ...DEFAULT_SETTINGS.welcomePopup, ...(stored?.welcomePopup ?? {}) };
     this.cache = { value, at: Date.now() };
     return value;
   }
@@ -32,7 +33,7 @@ export class SettingsService {
     const current = await this.get();
     const next: StoredSettings = { ...current };
     for (const [k, v] of Object.entries(patch) as [keyof StoredSettings, unknown][]) {
-      if (v === undefined || k === 'drop' || k === 'serviceImages') continue;
+      if (v === undefined || k === 'drop' || k === 'serviceImages' || k === 'welcomePopup') continue;
       (next as unknown as Record<string, unknown>)[k] = v;
     }
     if (patch.serviceImages) {
@@ -41,6 +42,16 @@ export class SettingsService {
         stylist: patch.serviceImages.stylist !== undefined ? patch.serviceImages.stylist || null : cur.stylist,
         store: patch.serviceImages.store !== undefined ? patch.serviceImages.store || null : cur.store,
         exchange: patch.serviceImages.exchange !== undefined ? patch.serviceImages.exchange || null : cur.exchange,
+      };
+    }
+    if (patch.welcomePopup) {
+      const cur = { ...DEFAULT_SETTINGS.welcomePopup, ...(next.welcomePopup ?? {}) };
+      const w = patch.welcomePopup;
+      next.welcomePopup = {
+        enabled: w.enabled ?? cur.enabled,
+        title: w.title?.trim() || cur.title,
+        text: w.text?.trim() || cur.text,
+        imageUrl: w.imageUrl !== undefined ? w.imageUrl || null : cur.imageUrl,
       };
     }
     if (patch.drop !== undefined) {

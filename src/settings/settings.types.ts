@@ -20,6 +20,12 @@ export const DEFAULT_SETTINGS: StoredSettings = {
   // Design v3 §3: one sentence-case line in the promo bar (only the first message is shown).
   tickerText: ['Discover Drop 04 — The Night Edit', 'Delivery across Nigeria', 'Exchange, never a refund'],
   serviceImages: { stylist: null, store: null, exchange: null },
+  welcomePopup: {
+    enabled: true,
+    title: 'Welcome to Amerapelle',
+    text: "Let's keep in touch. Be the first to discover new pieces and hear about private events at our Lagos store.",
+    imageUrl: null,
+  },
   drop: null,
 };
 

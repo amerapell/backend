@@ -45,7 +45,7 @@ export const COLLECTIONS: SeedCollection[] = [
     sortOrder: 0,
     homeOrder: 0,
     heroImageUrl: heroImage('Drop 04'),
-    tagline: 'Discover the drop',
+    tagline: null,
   },
   { slug: 'jewellery', name: 'Jewellery', description: 'Finishing pieces. For hygiene reasons jewellery is not exchangeable.', exchangeable: false, sortOrder: 7 },
 ];

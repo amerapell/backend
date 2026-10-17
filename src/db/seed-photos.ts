@@ -21,11 +21,13 @@ import { MEDIA_PATH } from '../storage/database-image.storage';
 import { createPool } from './database.module';
 import * as schema from './schema';
 import { DROP_SLUG } from './seed-data';
+import { DEFAULT_SETTINGS } from '../settings/settings.types';
 
 const MARKER_ID = 'seed:placeholder-photos-v1';
 const HIDE_MARKER_ID = 'seed:hide-photoless-v1';
 const SIMPLIFY_MARKER_ID = 'seed:simplify-v1';
 const STORE_DETAILS_MARKER_ID = 'seed:store-details-v1';
+const WELCOME_MARKER_ID = 'seed:welcome-popup-v1';
 const DAY = 86_400_000;
 const CLOTHING = ['XS', 'S', 'M', 'L', 'XL'];
 const MENS = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -147,6 +149,7 @@ async function main(): Promise<void> {
     await hidePhotoless(db, log);
     await simplify(db, log);
     await storeDetails(db, log);
+    await welcomePicture(db, log);
     await pool.end();
     return;
   }
@@ -242,6 +245,7 @@ async function main(): Promise<void> {
   await hidePhotoless(db, log);
   await simplify(db, log);
   await storeDetails(db, log);
+  await welcomePicture(db, log);
   await pool.end();
   log('done');
 }
@@ -329,6 +333,28 @@ async function storeDetails(db: NodePgDatabase<typeof schema>, log: (m: string) 
     .values({ id: STORE_DETAILS_MARKER_ID, data: { appliedAt: new Date().toISOString() } })
     .onConflictDoNothing({ target: schema.storeSettings.id });
   log('store details set: Novare Mall, Sangotedo');
+}
+
+/** Once per database: give the welcome pop-up a picture (The Night Edit banner) if it has none. */
+async function welcomePicture(db: NodePgDatabase<typeof schema>, log: (m: string) => void): Promise<void> {
+  const [done] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, WELCOME_MARKER_ID)).limit(1);
+  if (done) return;
+  const [row] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, 'default')).limit(1);
+  const [col] = await db.select({ url: schema.collections.heroImageUrl }).from(schema.collections).where(eq(schema.collections.slug, DROP_SLUG)).limit(1);
+  if (row && col?.url && !col.url.includes('placehold.co')) {
+    const data = row.data as Record<string, unknown>;
+    const current = (data.welcomePopup ?? {}) as Record<string, unknown>;
+    if (!current.imageUrl) {
+      await db
+        .update(schema.storeSettings)
+        .set({ data: { ...data, welcomePopup: { ...DEFAULT_SETTINGS.welcomePopup, ...current, imageUrl: col.url } }, updatedAt: new Date() })
+        .where(eq(schema.storeSettings.id, 'default'));
+      log('welcome pop-up picture set');
+    }
+  }
+  // drops are off: the old drop banner link text goes back to the default "Discover the collection"
+  await db.update(schema.collections).set({ tagline: null }).where(eq(schema.collections.tagline, 'Discover the drop'));
+  await db.insert(schema.storeSettings).values({ id: WELCOME_MARKER_ID, data: { appliedAt: new Date().toISOString() } }).onConflictDoNothing({ target: schema.storeSettings.id });
 }
 
 if (require.main === module) {
