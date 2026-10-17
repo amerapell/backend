@@ -20,7 +20,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest",
     "test:watch": "jest --watch",
-    "lint": "tsc --noEmit -p tsconfig.spec.json"
+    "lint": "tsc --noEmit -p tsconfig.spec.json",
+    "seed:photos": "node dist/db/seed-photos.js",
+    "seed:photos:dev": "ts-node src/db/seed-photos.ts"
   },
   "jest": {
     "moduleFileExtensions": [

@@ -17,7 +17,8 @@ COPY --from=build --chown=app:app /app/package.json ./package.json
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/dist ./dist
 COPY --from=build --chown=app:app /app/drizzle ./drizzle
+COPY --chown=app:app assets ./assets
 USER app
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD wget -qO- "http://127.0.0.1:${PORT:-4000}/api/v1/health" || exit 1
-CMD ["sh", "-c", "npm run migrate && (npm run seed -- --if-empty || echo '[seed] skipped after error') && npm run start:prod"]
+CMD ["sh", "-c", "npm run migrate && (npm run seed -- --if-empty || echo '[seed] skipped after error') && (npm run seed:photos || echo '[seed:photos] skipped after error') && npm run start:prod"]
