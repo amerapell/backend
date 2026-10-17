@@ -24,6 +24,7 @@ import { DROP_SLUG } from './seed-data';
 
 const MARKER_ID = 'seed:placeholder-photos-v1';
 const HIDE_MARKER_ID = 'seed:hide-photoless-v1';
+const SIMPLIFY_MARKER_ID = 'seed:simplify-v1';
 const DAY = 86_400_000;
 const CLOTHING = ['XS', 'S', 'M', 'L', 'XL'];
 const MENS = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -143,6 +144,7 @@ async function main(): Promise<void> {
   if (marker && !force) {
     log('already loaded — skipping');
     await hidePhotoless(db, log);
+    await simplify(db, log);
     await pool.end();
     return;
   }
@@ -236,6 +238,7 @@ async function main(): Promise<void> {
     .values({ id: MARKER_ID, data: { appliedAt: new Date().toISOString() } })
     .onConflictDoUpdate({ target: schema.storeSettings.id, set: { data: { appliedAt: new Date().toISOString() } } });
   await hidePhotoless(db, log);
+  await simplify(db, log);
   await pool.end();
   log('done');
 }
@@ -268,6 +271,39 @@ async function hidePhotoless(db: NodePgDatabase<typeof schema>, log: (m: string)
     .onConflictDoNothing({ target: schema.storeSettings.id });
   log(`products without photos moved to draft: ${drafted.length}${drafted.length ? ` (${drafted.map((d) => d.name).join(', ')})` : ''}`);
   log(`placeholder banner images cleared: ${cleared.length}`);
+}
+
+/**
+ * Once per database — right-size the shop for launch: no featured drop (the drop collection becomes a normal
+ * collection called "The Night Edit"), the starter WELCOME10 code off, Bachs off (Paystack only; tick it back on in
+ * Settings), and a calm one-line top bar. Everything stays editable in admin afterwards.
+ */
+async function simplify(db: NodePgDatabase<typeof schema>, log: (m: string) => void): Promise<void> {
+  const [done] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, SIMPLIFY_MARKER_ID)).limit(1);
+  if (done) return;
+  const [row] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, 'default')).limit(1);
+  if (row) {
+    const data = { ...(row.data as Record<string, unknown>) };
+    data.drop = null;
+    data.bachsEnabled = false;
+    data.tickerText = ['Delivery across Nigeria · Exchange, never a refund'];
+    await db.update(schema.storeSettings).set({ data, updatedAt: new Date() }).where(eq(schema.storeSettings.id, 'default'));
+  }
+  const drops = await db
+    .update(schema.collections)
+    .set({ isDrop: false, goLiveAt: null })
+    .where(eq(schema.collections.isDrop, true))
+    .returning({ slug: schema.collections.slug, name: schema.collections.name });
+  for (const d of drops) {
+    const plain = d.name.replace(/^Drop\s*\d+\s*[—/-]\s*/i, '').trim();
+    if (plain && plain !== d.name) await db.update(schema.collections).set({ name: plain }).where(eq(schema.collections.slug, d.slug));
+  }
+  await db.update(schema.discounts).set({ active: false }).where(eq(schema.discounts.code, 'WELCOME10'));
+  await db
+    .insert(schema.storeSettings)
+    .values({ id: SIMPLIFY_MARKER_ID, data: { appliedAt: new Date().toISOString() } })
+    .onConflictDoNothing({ target: schema.storeSettings.id });
+  log(`simplified: drop off (${drops.map((d) => d.slug).join(', ') || 'none'}), WELCOME10 off, Bachs off, top bar reset`);
 }
 
 if (require.main === module) {
