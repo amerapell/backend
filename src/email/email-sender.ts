@@ -6,6 +6,8 @@ export interface EmailMessage {
   html: string;
   text?: string;
   replyTo?: string;
+  /** Hidden copy — the store keeps a copy of every customer email in its own inbox. */
+  bcc?: string | string[];
 }
 
 export interface EmailSender {

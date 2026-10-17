@@ -9,7 +9,7 @@ export class ConsoleEmailSender implements EmailSender {
   async send(message: EmailMessage): Promise<{ id: string | null }> {
     this.sent.push(message);
     const to = Array.isArray(message.to) ? message.to.join(', ') : message.to;
-    this.logger.log(`[email:not-sent] to=${to} subject="${message.subject}"`);
+    this.logger.log(`[email:not-sent] to=${to}${message.bcc ? ` bcc=${[message.bcc].flat().join(', ')}` : ''} subject="${message.subject}"`);
     if (message.text) this.logger.debug(message.text);
     return { id: null };
   }

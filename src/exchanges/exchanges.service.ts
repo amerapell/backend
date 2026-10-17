@@ -163,6 +163,8 @@ export class ExchangesService {
   async complete(id: string, note?: string): Promise<Exchange> {
     const agg = await this.move(id, 'COMPLETED', note ?? null);
     await this.syncOrderStatus(agg.exchange.orderId);
-    return this.get(id);
+    const ex = await this.get(id);
+    await this.notifications.exchangeCompleted(ex, agg.exchange.email);
+    return ex;
   }
 }

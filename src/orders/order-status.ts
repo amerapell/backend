@@ -28,7 +28,7 @@ export function canAdminSetStatus(from: OrderStatus, to: OrderStatus): boolean {
 }
 
 /** Customer emails sent on these admin status changes. */
-export const NOTIFY_ON: OrderStatus[] = ['DISPATCHED', 'READY_FOR_PICKUP', 'DELIVERED'];
+export const NOTIFY_ON: OrderStatus[] = ['PROCESSING', 'READY_FOR_PICKUP', 'DISPATCHED', 'DELIVERED', 'CANCELLED'];
 
 export const FULFILMENT_QUEUE: OrderStatus[] = ['PAID', 'PROCESSING', 'READY_FOR_PICKUP'];
 export const PAID_STATUSES: OrderStatus[] = ['PAID', 'PROCESSING', 'READY_FOR_PICKUP', 'DISPATCHED', 'DELIVERED', 'EXCHANGE_REQUESTED', 'EXCHANGED'];

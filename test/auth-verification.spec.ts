@@ -282,6 +282,10 @@ describe('email + Google sign-in stay on one account', () => {
     const token = h.lastResetToken();
     expect(token).toBeTruthy();
     await h.auth.resetPassword(token!, password);
+    // security trail: a "password changed" email, sent to the customer only (no copy to the store)
+    const last = h.email.sent.at(-1)!;
+    expect(last.subject).toBe('Your Amerapelle password was changed');
+    expect(last.bcc).toBeUndefined();
   };
 
   it('Google first: password sign-in explains it is a Google account; "Forgot password" adds one and both then work', async () => {

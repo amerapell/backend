@@ -98,9 +98,44 @@ export function adminNewOrderEmail(order: Order, ctx: TemplateContext): Rendered
   };
 }
 
-export function orderStatusEmail(order: Order, ctx: TemplateContext): RenderedEmail | null {
+export function orderStatusEmail(order: Order, ctx: TemplateContext, extra: { creditReturnedKobo?: number } = {}): RenderedEmail | null {
   const url = `${ctx.frontendUrl}/account/orders/${order.number}`;
   switch (order.status) {
+    case 'PROCESSING':
+      return {
+        subject: `We're preparing order ${order.number}`,
+        html: renderLayout({
+          preheader: `Your order ${order.number} is being prepared.`,
+          eyebrow: `Order ${order.number} · Preparing`,
+          headlineHtml: 'Being <em>prepared.</em>',
+          bodyHtml:
+            paragraph(order.delivery.zone === 'PICKUP' ? "We're getting your pieces ready. We'll email you as soon as they're ready to collect." : "We're getting your pieces ready. We'll email you again when your order is on its way.") +
+            itemsTable(order),
+          cta: { label: 'View order', url },
+        }),
+        text: toText([`We're preparing order ${order.number}.`, url]),
+      };
+    case 'CANCELLED': {
+      const credit = extra.creditReturnedKobo ?? 0;
+      return {
+        subject: `Order ${order.number} cancelled`,
+        html: renderLayout({
+          preheader: credit ? `${formatNaira(credit)} has been added to your account as credit.` : `Your order ${order.number} has been cancelled.`,
+          eyebrow: `Order ${order.number} · Cancelled`,
+          headlineHtml: "We're <em>sorry.</em>",
+          bodyHtml:
+            paragraph("We couldn't fulfil your order, so we've cancelled it.") +
+            itemsTable(order) +
+            (credit
+              ? rows([['Credit added', formatNaira(credit)]]) +
+                paragraph('The full amount is now exchange credit on your account. It is applied automatically at checkout, so you can choose another piece. Credit cannot be paid out as cash.')
+              : '') +
+            paragraph(`Questions? Message us on WhatsApp (${esc(ctx.settings.whatsappNumber)}) with your order number.`),
+          cta: credit ? { label: 'Choose another piece', url: `${ctx.frontendUrl}/c/new-in` } : { label: 'View order', url },
+        }),
+        text: toText([`Order ${order.number} cancelled.`, credit ? `${formatNaira(credit)} added as exchange credit.` : '']),
+      };
+    }
     case 'DISPATCHED':
       return {
         subject: `Order ${order.number} is on its way`,
@@ -304,5 +339,68 @@ export function contactFormEmail(msg: ContactMessageInput): RenderedEmail {
       footerNote: 'Reply to this email to answer the customer directly.',
     }),
     text: toText([`From: ${msg.name} <${msg.email}> ${msg.phone ?? ''}`, `Subject: ${msg.subject}`, '', msg.message]),
+  };
+}
+
+export function orderNotCompletedEmail(order: Order, ctx: TemplateContext): RenderedEmail {
+  return {
+    subject: `Order ${order.number} wasn't completed`,
+    html: renderLayout({
+      preheader: 'We did not receive payment in time. Your bag is still saved.',
+      eyebrow: `Order ${order.number} · Not completed`,
+      headlineHtml: 'Payment <em>not received.</em>',
+      bodyHtml:
+        paragraph("We didn't receive payment for this order in time, so it has been closed and the pieces released. Nothing has been charged.") +
+        itemsTable(order) +
+        paragraph('Your bag is still saved if you would like to try again.'),
+      cta: { label: 'Back to your bag', url: `${ctx.frontendUrl}/bag` },
+    }),
+    text: toText([`Order ${order.number} wasn't completed — payment was not received in time. Nothing has been charged.`, `${ctx.frontendUrl}/bag`]),
+  };
+}
+
+export function exchangeRequestedCustomerEmail(ex: Exchange, ctx: TemplateContext): RenderedEmail {
+  return {
+    subject: `We received your exchange request ${ex.number}`,
+    html: renderLayout({
+      preheader: 'We will review your exchange request and reply by email.',
+      eyebrow: `Exchange ${ex.number} · Received`,
+      headlineHtml: 'Request <em>received.</em>',
+      bodyHtml:
+        paragraph(`Thank you. We've received your exchange request for order ${esc(ex.orderNumber)} and will reply by email, usually within one working day. Please keep the piece unworn, with its tags.`) +
+        exchangeItems(ex),
+      cta: { label: 'Track your exchange', url: `${ctx.frontendUrl}/account/exchanges` },
+    }),
+    text: toText([`We received your exchange request ${ex.number} for order ${ex.orderNumber}.`]),
+  };
+}
+
+export function exchangeCompletedEmail(ex: Exchange, ctx: TemplateContext): RenderedEmail {
+  return {
+    subject: `Exchange ${ex.number} complete`,
+    html: renderLayout({
+      preheader: 'Your exchange is complete.',
+      eyebrow: `Exchange ${ex.number} · Complete`,
+      headlineHtml: 'All <em>done.</em>',
+      bodyHtml: paragraph('Your exchange is complete. Thank you for shopping with Amerapelle.') + exchangeItems(ex),
+      cta: { label: 'View your exchanges', url: `${ctx.frontendUrl}/account/exchanges` },
+    }),
+    text: toText([`Exchange ${ex.number} complete.`]),
+  };
+}
+
+export function passwordChangedEmail(firstName: string, ctx: TemplateContext): RenderedEmail {
+  return {
+    subject: 'Your Amerapelle password was changed',
+    html: renderLayout({
+      preheader: 'Your password was changed.',
+      eyebrow: 'Account · Security',
+      headlineHtml: 'Password <em>changed.</em>',
+      bodyHtml:
+        paragraph(`Hi ${esc(firstName || 'there')}, the password for your Amerapelle account was just changed and you've been signed out on other devices.`) +
+        paragraph(`If this wasn't you, reset your password straight away and message us on WhatsApp (${esc(ctx.settings.whatsappNumber)}).`),
+      cta: { label: 'Reset password', url: `${ctx.frontendUrl}/account?view=forgot` },
+    }),
+    text: toText(['Your Amerapelle password was changed. If this was not you, reset it and contact us.']),
   };
 }

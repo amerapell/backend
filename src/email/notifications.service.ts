@@ -11,9 +11,13 @@ import {
   creditIssuedEmail,
   exchangeApprovedEmail,
   exchangeDeclinedEmail,
+  exchangeCompletedEmail,
   exchangeRequestedAdminEmail,
+  exchangeRequestedCustomerEmail,
   orderConfirmationEmail,
+  orderNotCompletedEmail,
   orderStatusEmail,
+  passwordChangedEmail,
   passwordResetEmail,
   TemplateContext,
   verifyEmailEmail,
@@ -40,13 +44,21 @@ export class NotificationsService {
     return this.config.values.adminNotifyEmail ?? (await this.settings.get()).contactEmail ?? null;
   }
 
-  private async deliver(to: string | null, email: RenderedEmail | null, replyTo?: string): Promise<void> {
+  private async deliver(to: string | null, email: RenderedEmail | null, replyTo?: string, bcc?: string | null): Promise<void> {
     if (!to || !email) return;
     try {
-      await this.sender.send({ to, subject: email.subject, html: email.html, text: email.text, replyTo });
+      await this.sender.send({ to, subject: email.subject, html: email.html, text: email.text, replyTo, ...(bcc && bcc !== to ? { bcc } : {}) });
     } catch (err) {
       this.logger.error(`Failed to send "${email.subject}" to ${to}: ${(err as Error).message}`);
     }
+  }
+
+  /**
+   * Order / exchange emails to the customer, with a hidden copy to the store's inbox so every step leaves a mail
+   * trail. Never used for sign-in links (password reset, email verification): those must reach only the customer.
+   */
+  private async deliverWithTrail(to: string | null, email: RenderedEmail | null): Promise<void> {
+    await this.deliver(to, email, undefined, await this.adminAddress());
   }
 
   async orderPaid(order: Order): Promise<void> {
@@ -57,24 +69,41 @@ export class NotificationsService {
     ]);
   }
 
-  async orderStatusChanged(order: Order): Promise<void> {
-    await this.deliver(order.email, orderStatusEmail(order, await this.ctx()));
+  async orderStatusChanged(order: Order, extra: { creditReturnedKobo?: number } = {}): Promise<void> {
+    await this.deliverWithTrail(order.email, orderStatusEmail(order, await this.ctx(), extra));
+  }
+
+  /** The payment window ran out before payment arrived. */
+  async orderNotCompleted(order: Order): Promise<void> {
+    await this.deliverWithTrail(order.email, orderNotCompletedEmail(order, await this.ctx()));
   }
 
   async exchangeRequested(ex: Exchange, customerEmail: string): Promise<void> {
-    await this.deliver(await this.adminAddress(), exchangeRequestedAdminEmail(ex, customerEmail, await this.ctx()), customerEmail);
+    const ctx = await this.ctx();
+    await Promise.all([
+      this.deliver(customerEmail, exchangeRequestedCustomerEmail(ex, ctx)),
+      this.deliver(await this.adminAddress(), exchangeRequestedAdminEmail(ex, customerEmail, ctx), customerEmail),
+    ]);
   }
 
   async exchangeApproved(ex: Exchange, customerEmail: string): Promise<void> {
-    await this.deliver(customerEmail, exchangeApprovedEmail(ex, await this.ctx()));
+    await this.deliverWithTrail(customerEmail, exchangeApprovedEmail(ex, await this.ctx()));
   }
 
   async exchangeDeclined(ex: Exchange, customerEmail: string): Promise<void> {
-    await this.deliver(customerEmail, exchangeDeclinedEmail(ex, await this.ctx()));
+    await this.deliverWithTrail(customerEmail, exchangeDeclinedEmail(ex, await this.ctx()));
   }
 
   async creditIssued(ex: Exchange, customerEmail: string, balanceKobo: number, expiresAt: Date | null): Promise<void> {
-    await this.deliver(customerEmail, creditIssuedEmail(ex, balanceKobo, expiresAt, await this.ctx()));
+    await this.deliverWithTrail(customerEmail, creditIssuedEmail(ex, balanceKobo, expiresAt, await this.ctx()));
+  }
+
+  async exchangeCompleted(ex: Exchange, customerEmail: string): Promise<void> {
+    await this.deliverWithTrail(customerEmail, exchangeCompletedEmail(ex, await this.ctx()));
+  }
+
+  async passwordChanged(email: string, firstName: string): Promise<void> {
+    await this.deliver(email, passwordChangedEmail(firstName, await this.ctx()));
   }
 
   async passwordReset(email: string, firstName: string, token: string): Promise<void> {

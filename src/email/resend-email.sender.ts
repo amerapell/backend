@@ -21,6 +21,7 @@ export class ResendEmailSender implements EmailSender {
       html: message.html,
       text: message.text,
       replyTo: message.replyTo,
+      ...(message.bcc ? { bcc: message.bcc } : {}),
     });
     if (error) {
       this.logger.error(`Resend error: ${error.message}`);

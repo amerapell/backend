@@ -52,6 +52,8 @@ export class OrderLifecycleService {
   async cancelUnpaid(order: OrderRow, paymentStatus: PaymentStatus): Promise<boolean> {
     const changed = await this.repo.cancelUnpaid(order.id, paymentStatus, this.clock.now());
     if (changed) await this.credit.reverseOrderSpend(order.id);
+    // Payment window ran out: tell the customer (their bag is kept). Start-up failures are shown on screen instead.
+    if (changed && paymentStatus === 'EXPIRED') await this.notifications.orderNotCompleted(await this.orders.byId(order.id));
     return changed;
   }
 
@@ -59,7 +61,7 @@ export class OrderLifecycleService {
     if (order.status === 'PENDING_PAYMENT') await this.repo.setPayment(order.id, { paymentStatus: status });
   }
 
-  /** ADM-3: admin status change; emails customer on DISPATCHED / READY_FOR_PICKUP / DELIVERED. */
+  /** ADM-3: admin status change; every step emails the customer (store gets a hidden copy). */
   async adminSetStatus(orderId: string, status: OrderStatus): Promise<Order> {
     const order = await this.repo.findById(orderId);
     if (!order) throw new NotFoundException('Order not found');
@@ -71,23 +73,25 @@ export class OrderLifecycleService {
       throw new BadRequestException('Only pickup orders can be marked ready for pickup');
     }
     const now = this.clock.now();
+    let creditReturnedKobo = 0;
     if (status === 'CANCELLED') {
       if (order.status === 'PENDING_PAYMENT') {
         await this.cancelUnpaid(order, 'FAILED');
         return this.orders.byId(order.id);
       }
       if (PAID_STATUSES.includes(order.status)) {
-        // Store cannot fulfil a paid order: stock goes back; any credit used is returned as credit.
-        // PAY-7: no provider refunds — the store never refunds money (exchange credit only).
+        // Store cannot fulfil a paid order: stock goes back; any credit used is returned as credit, and what was
+        // paid becomes exchange credit to choose another piece. PAY-7: no cash refunds — exchange credit only.
         await this.repo.restock(order.id);
         await this.credit.reverseOrderSpend(order.id);
+        creditReturnedKobo = order.creditAppliedKobo + (await this.credit.issueForUnfulfilledOrder(order.email, order.userId, order.amountDueKobo, order.id));
       }
       await this.repo.updateStatus(order.id, 'CANCELLED', { cancelledAt: now });
     } else {
       await this.repo.updateStatus(order.id, status, status === 'DELIVERED' ? { deliveredAt: now } : {});
     }
     const updated = await this.orders.byId(order.id);
-    if (NOTIFY_ON.includes(status)) await this.notifications.orderStatusChanged(updated);
+    if (NOTIFY_ON.includes(status)) await this.notifications.orderStatusChanged(updated, { creditReturnedKobo });
     return updated;
   }
 }

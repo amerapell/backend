@@ -43,11 +43,15 @@ describe('email templates (brand-styled, escaped)', () => {
     expect(e.html).not.toContain('<script>');
     expect(e.text).toContain('Total paid: ₦189,500');
   });
-  it('status emails only for dispatched / ready / delivered', () => {
+  it('status emails for every customer-facing step', () => {
     expect(orderStatusEmail({ ...order, status: 'DISPATCHED' }, ctx)?.subject).toContain('on its way');
     expect(orderStatusEmail({ ...order, status: 'READY_FOR_PICKUP' }, ctx)?.html).toContain('12 Store St');
     expect(orderStatusEmail({ ...order, status: 'DELIVERED' }, ctx)?.subject).toContain('delivered');
-    expect(orderStatusEmail({ ...order, status: 'PROCESSING' }, ctx)).toBeNull();
+    expect(orderStatusEmail({ ...order, status: 'PROCESSING' }, ctx)?.subject).toContain('preparing');
+    const cancelled = orderStatusEmail({ ...order, status: 'CANCELLED' }, ctx, { creditReturnedKobo: 18_950_000 });
+    expect(cancelled?.html).toContain('₦189,500');
+    expect(cancelled?.html).not.toMatch(/refunded/i);
+    expect(orderStatusEmail({ ...order, status: 'PAID' }, ctx)).toBeNull();
   });
   it('exchange approval carries return instructions and the store address', () => {
     const ex: Exchange = {

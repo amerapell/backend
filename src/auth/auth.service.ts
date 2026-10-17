@@ -187,6 +187,8 @@ export class AuthService {
     if (!userId) throw new BadRequestException('This reset link is invalid or has expired');
     await this.users.update(userId, { passwordHash: await this.hasher.hash(password) });
     await this.users.revokeAllRefreshTokens(userId, this.clock.now());
+    const user = await this.users.findById(userId);
+    if (user) await this.notifications.passwordChanged(user.email, user.firstName);
   }
 }
 

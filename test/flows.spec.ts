@@ -244,6 +244,7 @@ describe('checkout → payment (CHK, PAY)', () => {
     h.setVerify('abandoned', 0);
     h.clock.advance(16 * 60_000);
     await h.payments.expireStaleOrders();
+    expect(h.email.sent.at(-1)?.subject).toBe(`Order ${order.number} wasn't completed`);
     h.setVerify('success', order.amountDueKobo);
     const evt = h.signed({ event: 'charge.success', data: { id: 9, reference: payment.reference } });
     await h.payments.handleWebhook('PAYSTACK', evt.raw, evt.headers);
@@ -314,6 +315,8 @@ describe('exchanges (EXC-1..8)', () => {
     const { order, item } = await deliveredOrder(h);
     const shirt = item('Silk camp-collar shirt');
     const ex = await h.exchanges.request({ orderNumber: order.number, items: [{ orderItemId: shirt.id, quantity: 1 }], reason: 'Wrong size' }, customer);
+    const requestMails = h.email.sent.slice(-2).map((m) => m.subject);
+    expect(requestMails).toEqual(expect.arrayContaining(['We received your exchange request EX-2031', expect.stringContaining('Exchange EX-2031 requested')]));
     expect(ex).toMatchObject({ number: 'EX-2031', status: 'REQUESTED', items: [{ name: 'Silk camp-collar shirt', quantity: 1, valueKobo: 6_250_000 }] });
     expect((await h.ordersRepo.findById(order.id))?.status).toBe('EXCHANGE_REQUESTED');
 
@@ -331,6 +334,8 @@ describe('exchanges (EXC-1..8)', () => {
 
     await expect(h.exchanges.receive(ex.id)).rejects.toBeInstanceOf(BadRequestException); // no double credit
     expect((await h.exchanges.complete(ex.id)).status).toBe('COMPLETED');
+    expect(h.email.sent.at(-1)).toMatchObject({ subject: 'Exchange EX-2031 complete' });
+    expect(h.email.sent.at(-1)?.bcc).toBeTruthy();
     expect((await h.ordersRepo.findById(order.id))?.status).toBe('EXCHANGED');
   });
 
@@ -399,7 +404,7 @@ describe('admin order status (ADM-3)', () => {
     await expect(h.lifecycle.adminSetStatus(order.id, 'PROCESSING')).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('cancelling a paid order restocks and returns credit spent', async () => {
+  it('cancelling a paid order restocks, returns credit spent and turns what was paid into credit (no cash refund)', async () => {
     const h = harness();
     await h.creditRepo.add({ email: customer.email, amountKobo: 1_000_000, reason: 'EXCHANGE_CREDIT' });
     const cart = await h.carts.resolve({ userId: customer.id }, { create: true });
@@ -408,9 +413,33 @@ describe('admin order status (ADM-3)', () => {
     h.setVerify('success', order.amountDueKobo);
     await h.payments.confirm((await h.ordersRepo.findById(order.id))!);
     expect(h.w.stock.get('shirt-l')).toBe(4);
+    const sentBefore = h.email.sent.length;
     await h.lifecycle.adminSetStatus(order.id, 'CANCELLED');
     expect(h.w.stock.get('shirt-l')).toBe(5);
-    expect(await h.credit.balance(customer.email)).toBe(1_000_000);
+    // credit spent comes back + the amount paid by card becomes exchange credit
+    expect(await h.credit.balance(customer.email)).toBe(1_000_000 + order.amountDueKobo);
+    const mail = h.email.sent.at(-1)!;
+    expect(h.email.sent.length).toBe(sentBefore + 1);
+    expect(mail.subject).toBe(`Order ${order.number} cancelled`);
+    expect(mail.html).toContain('Credit added');
+    expect(mail.bcc).toBeTruthy(); // store keeps a copy
+    // a second cancel attempt can't add credit twice
+    await expect(h.lifecycle.adminSetStatus(order.id, 'CANCELLED')).resolves.toBeTruthy();
+    expect(await h.credit.balance(customer.email)).toBe(1_000_000 + order.amountDueKobo);
+  });
+
+  it('every admin step emails the customer with a copy to the store', async () => {
+    const h = harness();
+    const cart = await h.carts.resolve({}, { create: true });
+    await h.carts.addLine(cart, 'shirt-l', 1);
+    const { order } = await h.checkout.checkout({ token: cart.token }, dto());
+    h.setVerify('success', order.amountDueKobo);
+    await h.payments.confirm((await h.ordersRepo.findById(order.id))!);
+    await h.lifecycle.adminSetStatus(order.id, 'PROCESSING');
+    expect(h.email.sent.at(-1)?.subject).toBe(`We're preparing order ${order.number}`);
+    expect(h.email.sent.at(-1)?.bcc).toBeTruthy();
+    await h.lifecycle.adminSetStatus(order.id, 'DISPATCHED');
+    expect(h.email.sent.at(-1)?.bcc).toBeTruthy();
   });
 });
 

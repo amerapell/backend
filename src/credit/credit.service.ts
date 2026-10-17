@@ -14,6 +14,7 @@ export const CREDIT_REASONS = {
   ORDER_SPEND: 'ORDER_PAYMENT',
   ORDER_REVERSAL: 'ORDER_CANCELLED_REFUND_TO_CREDIT',
   ORDER_REVIVED: 'ORDER_PAYMENT_REAPPLIED',
+  ORDER_UNFULFILLED: 'ORDER_UNFULFILLED_CREDIT',
 } as const;
 
 /** EXC-4..6: exchange credit — issued on receipt, spent at checkout, never paid out as cash. */
@@ -57,6 +58,18 @@ export class CreditService {
       await this.repo.add({ email, userId, amountKobo, reason: CREDIT_REASONS.EXCHANGE, exchangeId, orderId, expiresAt });
     }
     return { balanceKobo: await this.balance(email), expiresAt };
+  }
+
+  /**
+   * The store cancelled a paid order it can't fulfil: what the customer paid becomes exchange credit to choose
+   * another piece (no cash refunds). Idempotent per order. Returns the credit added (0 if already done).
+   */
+  async issueForUnfulfilledOrder(email: string, userId: string | null, amountKobo: number, orderId: string): Promise<number> {
+    if (amountKobo <= 0) return 0;
+    const entries = await this.repo.entriesForOrder(orderId);
+    if (entries.some((e) => e.reason === CREDIT_REASONS.ORDER_UNFULFILLED)) return 0;
+    await this.repo.add({ email, userId, amountKobo, reason: CREDIT_REASONS.ORDER_UNFULFILLED, orderId, expiresAt: await this.expiryForNewCredit() });
+    return amountKobo;
   }
 
   /** Puts credit spent on an order back when that order is cancelled/expires unpaid. Idempotent per order. */
