@@ -144,7 +144,7 @@ export function orderStatusEmail(order: Order, ctx: TemplateContext, extra: { cr
           eyebrow: `Order ${order.number} · Dispatched`,
           headlineHtml: 'On its <em>way.</em>',
           bodyHtml:
-            paragraph(`Your order has left the studio. Expected: ${esc(order.delivery.name)}. Our rider will call the number on your order before delivery.`) +
+            paragraph(`Your order is on its way. Expected: ${esc(order.delivery.name)}. Our rider will call the number on your order before delivery.`) +
             itemsTable(order) +
             addressBlock(order, ctx),
           cta: { label: 'Track your order', url },
@@ -232,7 +232,7 @@ export function exchangeApprovedEmail(ex: Exchange, ctx: TemplateContext): Rende
         paragraph(
           `Drop it off in person or send it with a rider. Write <strong>${esc(ex.number)}</strong> on the package. Once we receive and check it, the full value is added to your account as exchange credit to spend on something new.`,
         ) +
-        (ex.history.at(-1)?.note ? paragraph(`${monoLabel('Note from the studio')}<br>${esc(ex.history.at(-1)?.note)}`) : ''),
+        (ex.history.at(-1)?.note ? paragraph(`${monoLabel('Note from Amerapelle')}<br>${esc(ex.history.at(-1)?.note)}`) : ''),
       cta: { label: 'Track your exchange', url: `${ctx.frontendUrl}/account/exchanges` },
     }),
     text: toText([

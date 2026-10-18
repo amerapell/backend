@@ -20,7 +20,7 @@ import { ImageProcessor } from '../storage/image-processor';
 import { MEDIA_PATH } from '../storage/database-image.storage';
 import { createPool } from './database.module';
 import * as schema from './schema';
-import { DROP_SLUG } from './seed-data';
+import { ABOUT_MARKDOWN, COLLECTIONS, DROP_SLUG, FAQ, HOME_INTRO } from './seed-data';
 import { DEFAULT_SETTINGS } from '../settings/settings.types';
 
 const MARKER_ID = 'seed:placeholder-photos-v1';
@@ -28,6 +28,7 @@ const HIDE_MARKER_ID = 'seed:hide-photoless-v1';
 const SIMPLIFY_MARKER_ID = 'seed:simplify-v1';
 const STORE_DETAILS_MARKER_ID = 'seed:store-details-v1';
 const WELCOME_MARKER_ID = 'seed:welcome-popup-v1';
+const CLIENT_COPY_MARKER_ID = 'seed:client-copy-v1';
 const DAY = 86_400_000;
 const CLOTHING = ['XS', 'S', 'M', 'L', 'XL'];
 const MENS = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -150,6 +151,7 @@ async function main(): Promise<void> {
     await simplify(db, log);
     await storeDetails(db, log);
     await welcomePicture(db, log);
+    await clientCopy(db, log);
     await pool.end();
     return;
   }
@@ -246,6 +248,7 @@ async function main(): Promise<void> {
   await simplify(db, log);
   await storeDetails(db, log);
   await welcomePicture(db, log);
+  await clientCopy(db, log);
   await pool.end();
   log('done');
 }
@@ -355,6 +358,46 @@ async function welcomePicture(db: NodePgDatabase<typeof schema>, log: (m: string
   // drops are off: the old drop banner link text goes back to the default "Discover the collection"
   await db.update(schema.collections).set({ tagline: null }).where(eq(schema.collections.tagline, 'Discover the drop'));
   await db.insert(schema.storeSettings).values({ id: WELCOME_MARKER_ID, data: { appliedAt: new Date().toISOString() } }).onConflictDoNothing({ target: schema.storeSettings.id });
+}
+
+/** Text the old seed wrote, replaced below only where the admin has not changed it since. */
+const OLD_COPY = {
+  collections: {
+    women: "Tailoring, silk and leather for evenings in Lagos. Every piece is a limited run; when it's gone, it's gone.",
+    'new-in': 'This week at the studio.',
+    [DROP_SLUG]: 'Forty-eight pieces cut for Lagos evenings: tailoring, leather and silk in navy, ink and ivory. Limited runs. No restocks.',
+  } as Record<string, string>,
+  faq: {
+    'Are your products genuine?': 'Every piece is designed by Amerapelle and made in limited runs. We do not resell other brands.',
+    'Do you restock?': 'Rarely. Drops are limited runs — when a piece is gone, it is gone.',
+  } as Record<string, string>,
+};
+
+/**
+ * Once per database: the client's brand copy — the home page introduction and the About page (both editable in
+ * admin → Pages) — and the old "made in limited runs" wording swapped for the multi-brand positioning.
+ */
+async function clientCopy(db: NodePgDatabase<typeof schema>, log: (m: string) => void): Promise<void> {
+  const [done] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, CLIENT_COPY_MARKER_ID)).limit(1);
+  if (done) return;
+  await db
+    .insert(schema.pages)
+    .values({ slug: 'home', ...HOME_INTRO })
+    .onConflictDoUpdate({ target: schema.pages.slug, set: { ...HOME_INTRO, updatedAt: new Date() } });
+  await db
+    .insert(schema.pages)
+    .values({ slug: 'about', title: 'About Amerapelle', bodyMarkdown: ABOUT_MARKDOWN })
+    .onConflictDoUpdate({ target: schema.pages.slug, set: { bodyMarkdown: ABOUT_MARKDOWN, updatedAt: new Date() } });
+  for (const [slug, old] of Object.entries(OLD_COPY.collections)) {
+    const next = COLLECTIONS.find((c) => c.slug === slug)?.description;
+    if (next) await db.update(schema.collections).set({ description: next }).where(and(eq(schema.collections.slug, slug), eq(schema.collections.description, old)));
+  }
+  for (const [question, old] of Object.entries(OLD_COPY.faq)) {
+    const next = FAQ.find((f) => f.question === question)?.answer;
+    if (next) await db.update(schema.faqItems).set({ answer: next, updatedAt: new Date() }).where(and(eq(schema.faqItems.question, question), eq(schema.faqItems.answer, old)));
+  }
+  await db.insert(schema.storeSettings).values({ id: CLIENT_COPY_MARKER_ID, data: { appliedAt: new Date().toISOString() } }).onConflictDoNothing({ target: schema.storeSettings.id });
+  log('client copy applied: home introduction, About page, FAQ and collection descriptions');
 }
 
 if (require.main === module) {

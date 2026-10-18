@@ -30,16 +30,16 @@ export interface SeedCollection {
 const heroImage = (label: string) => `https://placehold.co/1600x1000/cecdcb/000000/png?text=${encodeURIComponent(label)}`;
 
 export const COLLECTIONS: SeedCollection[] = [
-  { slug: 'women', name: 'Women', description: "Tailoring, silk and leather for evenings in Lagos. Every piece is a limited run; when it's gone, it's gone.", heroPattern: 'ADIRE', sortOrder: 1, homeOrder: 1, heroImageUrl: heroImage('Women') },
+  { slug: 'women', name: 'Women', description: 'Fashion, statement handbags, footwear and accessories, curated for her.', heroPattern: 'ADIRE', sortOrder: 1, homeOrder: 1, heroImageUrl: heroImage('Women') },
   { slug: 'men', name: 'Men', description: 'Tailoring, knitwear, leather.', sortOrder: 2, homeOrder: 2, heroImageUrl: heroImage('Men') },
   { slug: 'bags-accessories', name: 'Bags & Accessories', description: 'Structured leather, cut to carry a Lagos day into the night.', heroPattern: 'ASOOKE', sortOrder: 3, homeOrder: 3, heroImageUrl: heroImage('Bags & Accessories') },
   { slug: 'shoes', name: 'Shoes', description: 'Nappa and calf leather, sized EU.', sortOrder: 4, homeOrder: 4, heroImageUrl: heroImage('Shoes') },
-  { slug: 'new-in', name: 'New In', description: 'This week at the studio.', sortOrder: 5 },
+  { slug: 'new-in', name: 'New In', description: 'The latest arrivals.', sortOrder: 5 },
   { slug: 'sale', name: 'Sale', description: 'Last pieces, quietly reduced.', sortOrder: 6 },
   {
     slug: DROP_SLUG,
     name: 'Drop 04 / The Night Edit',
-    description: 'Forty-eight pieces cut for Lagos evenings: tailoring, leather and silk in navy, ink and ivory. Limited runs. No restocks.',
+    description: 'Evening pieces in navy, ink and ivory.',
     isDrop: true,
     heroPattern: 'ADIRE',
     sortOrder: 0,
@@ -384,25 +384,41 @@ export const FAQ: { group: string; question: string; answer: string }[] = [
   { group: 'Exchanges', question: 'Is everything exchangeable?', answer: 'Almost. Jewellery and pieces marked “not exchangeable” on the product page cannot be exchanged.' },
   { group: 'Sizing', question: 'How do your clothes fit?', answer: 'Most pieces fit true to size; each product page has fit notes and a size guide. Not sure? Ask a stylist on WhatsApp — we answer fast.' },
   { group: 'Sizing', question: 'Which shoe sizes do you use?', answer: 'EU sizing. The size guide on shoe pages converts EU to UK and US.' },
-  { group: 'Authenticity', question: 'Are your products genuine?', answer: 'Every piece is designed by Amerapelle and made in limited runs. We do not resell other brands.' },
-  { group: 'Authenticity', question: 'Do you restock?', answer: 'Rarely. Drops are limited runs — when a piece is gone, it is gone.' },
+  { group: 'Authenticity', question: 'Are your products genuine?', answer: 'Yes. Every piece is authentic and chosen by our team for quality and finish.' },
+  { group: 'Authenticity', question: 'Do you restock?', answer: 'Some pieces come back; many are available in small numbers only. Message us on WhatsApp to ask about a piece.' },
 ];
 
+/** Client copy (About page): the short version first. Editable in admin → Pages → about. */
+export const ABOUT_MARKDOWN = `# An Elevated World of Fashion.
+
+AMERAPELLE is a Lagos-based luxury multi-brand fashion house, bringing together a distinctive selection of sophisticated fashion, statement handbags, footwear, and accessories.
+
+Rooted in a passion for individuality and refined elegance, we curate collections for those who dress with intention, embrace their identity, and believe every appearance should leave a lasting impression.
+
+**AMERAPELLE — Beyond Fashion. A Statement of Distinction.**`;
+
+/** Client copy (home page introduction). Title = the small line above it. Editable in admin → Pages → home. */
+export const HOME_INTRO = {
+  title: 'AMERAPELLE',
+  bodyMarkdown: `# A WORLD OF STYLE. A SIGNATURE OF LUXURY.
+
+### Where Fashion Meets Distinction.
+
+Step into a world where elegance is effortless, individuality is celebrated, and every detail makes a statement.
+
+AMERAPELLE is a luxury multi-brand fashion house bringing together an exceptional selection of fashion, statement handbags, sophisticated footwear, and distinctive accessories.
+
+Curated for those who appreciate refined taste, confident expression, and the art of dressing exceptionally.
+
+[Discover Fashion Beyond the Ordinary.](/c/new-in)`,
+};
+
 export const PAGES: { slug: string; title: string; bodyMarkdown: string }[] = [
+  { slug: 'home', ...HOME_INTRO },
   {
     slug: 'about',
     title: 'About Amerapelle',
-    bodyMarkdown: `# Cut in Lagos for the evenings that matter.
-
-Amerapelle is a Lagos fashion house making tailoring, leather and silk in small, numbered runs. Every piece carries a number — **No. 014**, **No. 022** — and when a run sells out, it is gone.
-
-We work with Adire dyers in Abeokuta and Aso-oke weavers, and we put that cloth where you will feel it: in linings, bands and details.
-
-## Our promises
-- **Delivered across Nigeria.** Lagos in 1–3 working days.
-- **Exchange, not refund.** Swap any unworn piece for credit.
-- **Pay your way.** Paystack in naira, Bachs from abroad.
-- **A stylist on WhatsApp.** Fit and sizing, answered fast.`,
+    bodyMarkdown: ABOUT_MARKDOWN,
   },
   {
     slug: 'delivery',
