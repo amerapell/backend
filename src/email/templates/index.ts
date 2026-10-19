@@ -1,3 +1,5 @@
+import { isInternationalZone } from '../../common/countries';
+import { addressLines } from '../../checkout/address-normaliser';
 import type { Exchange, Order, StoreSettings } from '../../common/contract';
 import { formatNaira } from '../../common/money';
 import { esc, monoLabel, paragraph, renderLayout, rows, RenderedEmail, rule, toText, BRAND } from './layout';
@@ -38,7 +40,7 @@ function addressBlock(order: Order, ctx: TemplateContext): string {
   const a = order.delivery.address;
   if (!a) return '';
   return paragraph(
-    `${monoLabel('Delivering to')}<br>${esc(a.fullName)} · ${esc(a.phone)}<br>${esc(a.street)}, ${esc(a.area)}<br>${esc(a.lga)}, ${esc(a.state)}${a.landmark ? `<br>Landmark: ${esc(a.landmark)}` : ''}`,
+    `${monoLabel('Delivering to')}<br>${esc(a.fullName)} · ${esc(a.phone)}<br>${addressLines(a).map(esc).join('<br>')}${a.landmark ? `<br>Landmark: ${esc(a.landmark)}` : ''}`,
   );
 }
 
@@ -144,7 +146,11 @@ export function orderStatusEmail(order: Order, ctx: TemplateContext, extra: { cr
           eyebrow: `Order ${order.number} · Dispatched`,
           headlineHtml: 'On its <em>way.</em>',
           bodyHtml:
-            paragraph(`Your order is on its way. Expected: ${esc(order.delivery.name)}. Our rider will call the number on your order before delivery.`) +
+            paragraph(
+              isInternationalZone(order.delivery.zone)
+                ? `Your order is on its way with ${esc(order.delivery.name)}. DHL will contact you before delivery; any import duties in your country are paid to DHL.`
+                : `Your order is on its way. Expected: ${esc(order.delivery.name)}. Our rider will call the number on your order before delivery.`,
+            ) +
             itemsTable(order) +
             addressBlock(order, ctx),
           cta: { label: 'Track your order', url },

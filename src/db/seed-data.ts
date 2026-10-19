@@ -360,19 +360,31 @@ export const PRODUCTS: SeedProduct[] = [
   },
 ];
 
+/** Outside Nigeria: DHL Express, one option per price region. Fees are starting points — set the real ones in admin. */
+export const INTERNATIONAL_DELIVERY_ZONES: { code: ZoneCode; name: string; etaText: string; feeNaira: number; sortOrder: number }[] = [
+  { code: 'INTL_AFRICA', name: 'DHL Express · Africa', etaText: '3–6 working days', feeNaira: 45000, sortOrder: 10 },
+  { code: 'INTL_EUROPE', name: 'DHL Express · UK & Europe', etaText: '3–5 working days', feeNaira: 75000, sortOrder: 11 },
+  { code: 'INTL_AMERICAS', name: 'DHL Express · USA & Canada', etaText: '3–6 working days', feeNaira: 85000, sortOrder: 12 },
+  { code: 'INTL_WORLD', name: 'DHL Express · Rest of the world', etaText: '4–8 working days', feeNaira: 95000, sortOrder: 13 },
+];
+
 export const DELIVERY_ZONES: { code: ZoneCode; name: string; etaText: string; feeNaira: number; sortOrder: number }[] = [
   { code: 'LAGOS_ISLAND', name: 'Lagos Island', etaText: '1–2 working days', feeNaira: 5000, sortOrder: 1 },
   { code: 'LAGOS_MAINLAND', name: 'Lagos Mainland', etaText: '1–3 working days', feeNaira: 4000, sortOrder: 2 },
   { code: 'LEKKI_AJAH', name: 'Lekki – Ajah', etaText: '1–2 working days', feeNaira: 4500, sortOrder: 3 },
   { code: 'OTHER_STATES', name: 'Other states', etaText: '3–5 working days', feeNaira: 9500, sortOrder: 4 },
   { code: 'PICKUP', name: 'Collect from the store', etaText: 'Ready same day', feeNaira: 0, sortOrder: 5 },
+  ...INTERNATIONAL_DELIVERY_ZONES,
 ];
+
+export const FAQ_WHERE_WE_DELIVER =
+  'Worldwide. In Nigeria: Lagos Island and Lekki–Ajah in 1–2 working days, Lagos Mainland in 1–3, other states in 3–5. Outside Nigeria we ship with DHL Express (3–8 working days); import duties, if any, are paid on delivery. Fees are shown at checkout.';
 
 export const FAQ: { group: string; question: string; answer: string }[] = [
   { group: 'Orders', question: 'Can I check out as a guest?', answer: 'Yes. You only need an email and phone number. Create an account any time to see your orders, save addresses and use exchange credit.' },
   { group: 'Orders', question: 'How do I find my order?', answer: 'Use your order number (AP-xxxxx) and the email you checked out with on the order lookup page, or sign in to see your full history.' },
   { group: 'Orders', question: 'Can I change or cancel my order?', answer: 'Message us on WhatsApp as soon as possible. Once an order has been dispatched it cannot be changed.' },
-  { group: 'Delivery', question: 'Where do you deliver?', answer: 'Across Nigeria. Lagos Island and Lekki–Ajah in 1–2 working days, Lagos Mainland in 1–3, other states in 3–5. Fees are shown at checkout.' },
+  { group: 'Delivery', question: 'Where do you deliver?', answer: FAQ_WHERE_WE_DELIVER },
   { group: 'Delivery', question: 'Can I collect from the store?', answer: 'Yes — choose “Collect from the store” at checkout. It is free and usually ready the same day; we email you when it is ready.' },
   { group: 'Delivery', question: 'Is delivery ever free?', answer: 'Delivery is free on orders over the threshold shown in your bag.' },
   { group: 'Payments', question: 'How can I pay?', answer: 'Paystack for naira cards, bank transfer and USSD. Bachs if you are paying from abroad — cards in your own currency, bank transfer or USDT / USDC. Both settle in naira.' },
@@ -418,7 +430,12 @@ export const EXCHANGES_TITLE = 'Our Exchange Promise';
 export const EXCHANGES_INTRO = `# Our Exchange Promise
 
 Your satisfaction is our priority. Every eligible piece can be exchanged for store credit — purchases are exchanged rather than refunded — so you can choose something you love.`;
-export const TICKER_TEXT = 'Delivery across Nigeria · Your satisfaction, our priority';
+export const TICKER_TEXT = 'Worldwide delivery · Your satisfaction, our priority';
+
+/** Worldwide delivery (DHL) — rows/notes for the delivery page, also added to live databases by seed:photos. */
+export const DELIVERY_ABROAD_ROWS = `| Outside Nigeria — DHL Express | 3–8 working days | By region, shown at checkout |`;
+export const DELIVERY_ABROAD_NOTES = `- **We deliver worldwide.** Outside Nigeria we ship with DHL Express and email you when your order leaves Lagos; DHL contacts you before delivery.
+- Import duties and taxes in your country, if any, are paid to DHL on delivery.`;
 
 export const PAGES: { slug: string; title: string; bodyMarkdown: string }[] = [
   { slug: 'home', ...HOME_INTRO },
@@ -439,11 +456,13 @@ export const PAGES: { slug: string; title: string; bodyMarkdown: string }[] = [
 | Lekki – Ajah | 1–2 working days | Shown at checkout |
 | Other states | 3–5 working days | Flat fee, shown at checkout |
 | Collect from the store | Ready same day | Free |
+${DELIVERY_ABROAD_ROWS}
 
 - Orders placed before 2 pm on a working day are usually dispatched the same day.
 - Our rider will call the phone number on your order before delivery. Please add a nearest landmark — it helps.
-- Delivery is free above the threshold shown in your bag.
-- For pickup, we email you when your order is ready. Bring your order number.`,
+- Delivery is free above the threshold shown in your bag (Nigeria only).
+- For pickup, we email you when your order is ready. Bring your order number.
+${DELIVERY_ABROAD_NOTES}`,
   },
   {
     slug: 'exchanges',

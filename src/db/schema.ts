@@ -20,7 +20,7 @@ export const roleEnum = pgEnum('role', ['CUSTOMER', 'ADMIN']);
 export const productStatusEnum = pgEnum('product_status', ['DRAFT', 'LIVE', 'ARCHIVED']);
 export const sizeGuideEnum = pgEnum('size_guide', ['CLOTHING', 'SHOES', 'NONE']);
 export const heroPatternEnum = pgEnum('hero_pattern', ['ADIRE', 'ASOOKE']);
-export const zoneCodeEnum = pgEnum('zone_code', ['LAGOS_ISLAND', 'LAGOS_MAINLAND', 'LEKKI_AJAH', 'OTHER_STATES', 'PICKUP']);
+export const zoneCodeEnum = pgEnum('zone_code', ['LAGOS_ISLAND', 'LAGOS_MAINLAND', 'LEKKI_AJAH', 'OTHER_STATES', 'PICKUP', 'INTL_AFRICA', 'INTL_EUROPE', 'INTL_AMERICAS', 'INTL_WORLD']);
 export const orderStatusEnum = pgEnum('order_status', [
   'PENDING_PAYMENT',
   'PAID',
@@ -145,6 +145,8 @@ export const addresses = pgTable(
     street: text('street').notNull(),
     landmark: text('landmark').notNull().default(''),
     note: text('note'),
+    country: text('country').notNull().default('NG'),
+    postcode: text('postcode').notNull().default(''),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -358,6 +360,9 @@ export interface AddressSnapshot {
   street: string;
   landmark: string;
   note?: string | null;
+  /** ISO 3166-1 alpha-2 (absent on orders placed before worldwide delivery = Nigeria). */
+  country?: string;
+  postcode?: string;
 }
 
 export const orders = pgTable(

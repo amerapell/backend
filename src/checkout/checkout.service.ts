@@ -12,7 +12,8 @@ import type { AuthUser } from '../common/auth-types';
 import type { Order, ProviderCode, Quote, ZoneCode } from '../common/contract';
 import { randomToken } from '../common/ids';
 import { allocateProportionally } from '../common/money';
-import { normalizeNigerianPhone } from '../common/phone';
+import { isInternationalZone } from '../common/countries';
+import { normalizeInternationalPhone, normalizeNigerianPhone } from '../common/phone';
 import { CartIdentity, CartService, PricedCart } from '../cart/cart.service';
 import { CreditService } from '../credit/credit.service';
 import { EMAIL_VERIFICATION_LOOKUP, EmailVerificationLookup } from '../credit/email-verification.lookup';
@@ -99,9 +100,10 @@ export class CheckoutService {
     if (priced.promoResult && !priced.promoResult.valid) throw new BadRequestException(priced.promoResult.reason);
 
     const zone = await this.zone(dto.zoneCode);
-    const phone = normalizeNigerianPhone(dto.phone);
-    if (!phone) throw new BadRequestException('Enter a valid Nigerian phone number (080… or +234…)');
-    const address = zone.code === 'PICKUP' ? null : dto.address ? normaliseAddress(dto.address) : null;
+    const abroad = isInternationalZone(zone.code);
+    const phone = abroad ? normalizeInternationalPhone(dto.phone) : normalizeNigerianPhone(dto.phone);
+    if (!phone) throw new BadRequestException(abroad ? 'Enter a phone number with its country code (e.g. +44 7700 900123)' : 'Enter a valid Nigerian phone number (080… or +234…)');
+    const address = zone.code === 'PICKUP' ? null : dto.address ? normaliseAddress(dto.address, zone.code) : null;
     if (zone.code !== 'PICKUP' && !address) throw new BadRequestException('A delivery address is required');
 
     const totals = await this.totals(priced, zone, dto.useCredit, customer);

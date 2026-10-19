@@ -5,8 +5,9 @@ export type Money = number;
 
 export type Badge = 'NEW' | 'SALE' | 'DROP' | 'LOW_STOCK' | 'SOLD_OUT';
 export type SizeGuide = 'CLOTHING' | 'SHOES' | 'NONE';
-export type ZoneCode = 'LAGOS_ISLAND' | 'LAGOS_MAINLAND' | 'LEKKI_AJAH' | 'OTHER_STATES' | 'PICKUP';
-export const ZONE_CODES: ZoneCode[] = ['LAGOS_ISLAND', 'LAGOS_MAINLAND', 'LEKKI_AJAH', 'OTHER_STATES', 'PICKUP'];
+/** Nigerian zones, store pickup, and DHL Express regions for delivery abroad (INTL_*). */
+export type ZoneCode = 'LAGOS_ISLAND' | 'LAGOS_MAINLAND' | 'LEKKI_AJAH' | 'OTHER_STATES' | 'PICKUP' | 'INTL_AFRICA' | 'INTL_EUROPE' | 'INTL_AMERICAS' | 'INTL_WORLD';
+export const ZONE_CODES: ZoneCode[] = ['LAGOS_ISLAND', 'LAGOS_MAINLAND', 'LEKKI_AJAH', 'OTHER_STATES', 'PICKUP', 'INTL_AFRICA', 'INTL_EUROPE', 'INTL_AMERICAS', 'INTL_WORLD'];
 
 export type OrderStatus =
   | 'PENDING_PAYMENT'
@@ -149,6 +150,9 @@ export interface Address {
   street: string;
   landmark: string;
   note?: string | null;
+  /** ISO 3166-1 alpha-2; missing/'NG' = Nigeria. Abroad: state = state/region, lga = city, area = district (optional). */
+  country?: string;
+  postcode?: string;
 }
 
 export interface OrderItem {

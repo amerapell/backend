@@ -50,6 +50,13 @@
       "when": 1792419341807,
       "tag": "0006_product_image_scale",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792421399977,
+      "tag": "0007_worldwide_delivery",
+      "breakpoints": true
     }
   ]
 }

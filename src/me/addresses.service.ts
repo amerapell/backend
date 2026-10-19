@@ -15,7 +15,13 @@ export function toAddress(a: AddressRow): Address {
     street: a.street,
     landmark: a.landmark,
     note: a.note,
+    country: a.country || 'NG',
+    postcode: a.postcode ?? '',
   };
+}
+
+function withCountry(a: AddressSnapshot) {
+  return { ...a, note: a.note ?? null, country: a.country || 'NG', postcode: a.postcode ?? '' };
 }
 
 /** ACC-3 saved addresses. */
@@ -29,12 +35,12 @@ export class AddressesService {
 
   async create(userId: string, input: Address): Promise<Address> {
     const a = normaliseAddress(input);
-    return toAddress(await this.repo.createAddress(userId, { ...a, note: a.note ?? null }));
+    return toAddress(await this.repo.createAddress(userId, withCountry(a)));
   }
 
   async update(userId: string, id: string, input: Address): Promise<Address> {
     const a = normaliseAddress(input);
-    const row = await this.repo.updateAddress(userId, id, { ...a, note: a.note ?? null });
+    const row = await this.repo.updateAddress(userId, id, withCountry(a));
     if (!row) throw new NotFoundException('Address not found');
     return toAddress(row);
   }
@@ -47,9 +53,9 @@ export class AddressesService {
   /** Called from checkout with "save this address": skips exact duplicates. */
   async saveIfNew(userId: string, a: AddressSnapshot): Promise<void> {
     const existing = await this.repo.addresses(userId);
-    const key = (x: Pick<AddressSnapshot, 'street' | 'area' | 'lga' | 'state' | 'phone'>) =>
-      [x.street, x.area, x.lga, x.state, x.phone].map((v) => v.trim().toLowerCase()).join('|');
+    const key = (x: Pick<AddressSnapshot, 'street' | 'area' | 'lga' | 'state' | 'phone' | 'country' | 'postcode'>) =>
+      [x.street, x.area, x.lga, x.state, x.phone, x.country || 'NG', x.postcode ?? ''].map((v) => v.trim().toLowerCase()).join('|');
     if (existing.some((e) => key(e) === key(a))) return;
-    await this.repo.createAddress(userId, { ...a, note: a.note ?? null });
+    await this.repo.createAddress(userId, withCountry(a));
   }
 }

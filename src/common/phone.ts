@@ -25,3 +25,17 @@ export function normalizeNigerianPhone(input: string | null | undefined): string
 export function isValidNigerianPhone(input: string | null | undefined): boolean {
   return normalizeNigerianPhone(input) !== null;
 }
+
+/**
+ * Phone for delivery abroad: any international number with its country code, returned as E.164 (+<8–15 digits>).
+ * A Nigerian number written the local way (080…) is still accepted.
+ */
+export function normalizeInternationalPhone(input: string | null | undefined): string | null {
+  if (!input) return null;
+  const ng = normalizeNigerianPhone(input);
+  if (ng) return ng;
+  let digits = String(input).trim().replace(/[\s\-().]/g, '');
+  if (digits.startsWith('00')) digits = `+${digits.slice(2)}`;
+  if (!/^\+\d{8,15}$/.test(digits) || digits.startsWith('+0')) return null;
+  return digits;
+}

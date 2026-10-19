@@ -1,3 +1,4 @@
+import { addressLines } from '../../checkout/address-normaliser';
 import type { Order, StoreSettings } from '../../common/contract';
 import { escapeHtml as esc } from '../../common/html';
 import { formatNaira } from '../../common/money';
@@ -35,7 +36,7 @@ footer{margin-top:28px;border-top:1px solid #0a0a0f;padding-top:10px}
 <div><div class="mono">${order.delivery.zone === 'PICKUP' ? 'Collect from store' : 'Deliver to'}</div>
 ${
   a
-    ? `<p><strong>${esc(a.fullName)}</strong><br>${esc(a.phone)}<br>${esc(a.street)}<br>${esc(a.area)}, ${esc(a.lga)}<br>${esc(a.state)}${a.landmark ? `<br>Landmark: ${esc(a.landmark)}` : ''}${a.note ? `<br><em>${esc(a.note)}</em>` : ''}</p>`
+    ? `<p><strong>${esc(a.fullName)}</strong><br>${esc(a.phone)}<br>${addressLines(a).map(esc).join('<br>')}${a.landmark ? `<br>Landmark: ${esc(a.landmark)}` : ''}${a.note ? `<br><em>${esc(a.note)}</em>` : ''}</p>`
     : `<p>${esc(settings.pickupAddress)}<br>${esc(order.phone)}</p>`
 }</div>
 <div><div class="mono">Delivery</div><p>${esc(order.delivery.name)}<br>${esc(order.email)}<br>${esc(order.phone)}</p></div>

@@ -20,7 +20,20 @@ import { ImageProcessor } from '../storage/image-processor';
 import { MEDIA_PATH } from '../storage/database-image.storage';
 import { createPool } from './database.module';
 import * as schema from './schema';
-import { ABOUT_MARKDOWN, COLLECTIONS, DROP_SLUG, EXCHANGES_INTRO, EXCHANGES_TITLE, FAQ, HOME_INTRO, TICKER_TEXT } from './seed-data';
+import {
+  ABOUT_MARKDOWN,
+  COLLECTIONS,
+  DELIVERY_ABROAD_NOTES,
+  DELIVERY_ABROAD_ROWS,
+  DROP_SLUG,
+  EXCHANGES_INTRO,
+  EXCHANGES_TITLE,
+  FAQ,
+  FAQ_WHERE_WE_DELIVER,
+  HOME_INTRO,
+  INTERNATIONAL_DELIVERY_ZONES,
+  TICKER_TEXT,
+} from './seed-data';
 import { DEFAULT_SETTINGS } from '../settings/settings.types';
 
 const MARKER_ID = 'seed:placeholder-photos-v1';
@@ -33,6 +46,7 @@ const HOME_PHOTOS_MARKER_ID = 'seed:home-photos-v1';
 const CATALOGUE_MARKER_ID = 'seed:catalogue-v2';
 const IMAGE_SCALE_MARKER_ID = 'seed:image-scale-v1';
 const WORDING_MARKER_ID = 'seed:wording-v1';
+const WORLDWIDE_MARKER_ID = 'seed:worldwide-delivery-v1';
 const DAY = 86_400_000;
 const CLOTHING = ['XS', 'S', 'M', 'L', 'XL'];
 const MENS = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -176,6 +190,7 @@ async function main(): Promise<void> {
     await catalogueV2(db, config.publicApiUrl, log);
     await imageScale(db, log);
     await wording(db, log);
+    await worldwideDelivery(db, log);
     await pool.end();
     return;
   }
@@ -262,6 +277,7 @@ async function main(): Promise<void> {
   await catalogueV2(db, config.publicApiUrl, log);
   await imageScale(db, log);
   await wording(db, log);
+  await worldwideDelivery(db, log);
   await pool.end();
   log('done');
 }
@@ -602,6 +618,57 @@ async function wording(db: NodePgDatabase<typeof schema>, log: (m: string) => vo
   }
   await db.insert(schema.storeSettings).values({ id: WORDING_MARKER_ID, data: { appliedAt: new Date().toISOString(), changed } }).onConflictDoNothing({ target: schema.storeSettings.id });
   log(`wording updated: ${changed.join(', ') || 'nothing to change'}`);
+}
+
+/**
+ * Once per database: worldwide delivery. Adds the four DHL Express options (fees editable in admin → Delivery zones),
+ * and updates the delivery page, the "Where do you deliver?" answer and the top bar — only where the text is still the
+ * starter wording.
+ */
+async function worldwideDelivery(db: NodePgDatabase<typeof schema>, log: (m: string) => void): Promise<void> {
+  const [done] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, WORLDWIDE_MARKER_ID)).limit(1);
+  if (done) return;
+  const changed: string[] = [];
+  const added = await db
+    .insert(schema.deliveryZones)
+    .values(INTERNATIONAL_DELIVERY_ZONES.map((z) => ({ code: z.code, name: z.name, etaText: z.etaText, feeKobo: nairaToKobo(z.feeNaira), sortOrder: z.sortOrder, active: true })))
+    .onConflictDoNothing()
+    .returning({ code: schema.deliveryZones.code });
+  if (added.length) changed.push(`${added.length} DHL options`);
+
+  const [page] = await db.select().from(schema.pages).where(eq(schema.pages.slug, 'delivery')).limit(1);
+  const pickupRow = '| Collect from the store | Ready same day | Free |';
+  if (page && page.bodyMarkdown.includes(pickupRow) && !page.bodyMarkdown.includes('DHL')) {
+    const body = page.bodyMarkdown
+      .replace(pickupRow, `${pickupRow}\n${DELIVERY_ABROAD_ROWS}`)
+      .replace('- Delivery is free above the threshold shown in your bag.', '- Delivery is free above the threshold shown in your bag (Nigeria only).')
+      .trimEnd()
+      .concat(`\n${DELIVERY_ABROAD_NOTES}`);
+    await db.update(schema.pages).set({ bodyMarkdown: body, updatedAt: new Date() }).where(eq(schema.pages.slug, 'delivery'));
+    changed.push('delivery page');
+  }
+  const oldAnswer = 'Across Nigeria. Lagos Island and Lekki–Ajah in 1–2 working days, Lagos Mainland in 1–3, other states in 3–5. Fees are shown at checkout.';
+  const faq = await db.update(schema.faqItems).set({ answer: FAQ_WHERE_WE_DELIVER, updatedAt: new Date() }).where(and(eq(schema.faqItems.question, 'Where do you deliver?'), eq(schema.faqItems.answer, oldAnswer))).returning({ id: schema.faqItems.id });
+  if (faq.length) changed.push('FAQ');
+
+  const [row] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, 'default')).limit(1);
+  const ticker = (row?.data as { tickerText?: string[] } | undefined)?.tickerText ?? [];
+  const oldTickers = ['Delivery across Nigeria · Your satisfaction, our priority', 'Delivery across Nigeria · Exchange, never a refund'];
+  if (row) {
+    const data = { ...(row.data as Record<string, unknown>) };
+    if (ticker.length === 1 && oldTickers.includes(ticker[0])) {
+      data.tickerText = [TICKER_TEXT];
+      changed.push('top bar');
+    }
+    // The client's real inbox (customers see it; store copies go here unless ADMIN_NOTIFY_EMAIL is set).
+    if (!data.contactEmail || data.contactEmail === 'hello@amerapelle.com') {
+      data.contactEmail = 'amerapelle@gmail.com';
+      changed.push('contact email');
+    }
+    await db.update(schema.storeSettings).set({ data, updatedAt: new Date() }).where(eq(schema.storeSettings.id, 'default'));
+  }
+  await db.insert(schema.storeSettings).values({ id: WORLDWIDE_MARKER_ID, data: { appliedAt: new Date().toISOString(), changed } }).onConflictDoNothing({ target: schema.storeSettings.id });
+  log(`worldwide delivery: ${changed.join(', ') || 'nothing to change'}`);
 }
 
 if (require.main === module) {

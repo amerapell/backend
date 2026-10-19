@@ -1,3 +1,4 @@
+import { isInternationalZone } from '../common/countries';
 import type { ZoneCode } from '../common/contract';
 
 export interface QuoteInput {
@@ -29,7 +30,8 @@ export function computeQuote(input: QuoteInput): QuoteTotals {
   const subtotal = Math.max(0, input.subtotalKobo);
   const discount = Math.min(subtotal, Math.max(0, input.discountKobo));
   const merchandise = subtotal - discount;
-  const thresholdMet = input.freeDeliveryThresholdKobo !== null && merchandise >= input.freeDeliveryThresholdKobo;
+  // The free-delivery threshold covers Nigerian delivery only — DHL abroad is always charged.
+  const thresholdMet = !isInternationalZone(input.zone.code) && input.freeDeliveryThresholdKobo !== null && merchandise >= input.freeDeliveryThresholdKobo;
   const delivery =
     input.zone.code === 'PICKUP' || input.freeDeliveryPromo || thresholdMet ? 0 : Math.max(0, input.zone.feeKobo);
   const total = merchandise + delivery;

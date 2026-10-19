@@ -10,7 +10,7 @@ export const DEFAULT_SETTINGS: StoredSettings = {
   whatsappNumber: '+2349046762972',
   instagramUrl: 'https://instagram.com/amerapelle',
   tiktokUrl: 'https://tiktok.com/@amerapelle',
-  contactEmail: 'hello@amerapelle.com',
+  contactEmail: 'amerapelle@gmail.com',
   contactPhone: '+234 904 676 2972',
   paystackEnabled: true,
   bachsEnabled: true,
@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS: StoredSettings = {
   creditExpiryDays: null,
   freeDeliveryThresholdKobo: 30000000,
   // Design v3 §3: one sentence-case line in the promo bar (only the first message is shown).
-  tickerText: ['Delivery across Nigeria · Your satisfaction, our priority'],
+  tickerText: ['Worldwide delivery · Your satisfaction, our priority'],
   serviceImages: { stylist: null, store: null, exchange: null },
   welcomePopup: {
     enabled: true,
