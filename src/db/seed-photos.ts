@@ -30,6 +30,7 @@ const STORE_DETAILS_MARKER_ID = 'seed:store-details-v1';
 const WELCOME_MARKER_ID = 'seed:welcome-popup-v1';
 const CLIENT_COPY_MARKER_ID = 'seed:client-copy-v1';
 const HOME_PHOTOS_MARKER_ID = 'seed:home-photos-v1';
+const CATALOGUE_MARKER_ID = 'seed:catalogue-v2';
 const DAY = 86_400_000;
 const CLOTHING = ['XS', 'S', 'M', 'L', 'XL'];
 const MENS = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -170,6 +171,7 @@ async function main(): Promise<void> {
     await welcomePicture(db, log);
     await clientCopy(db, log);
     await homePhotos(db, config.publicApiUrl, log);
+    await catalogueV2(db, config.publicApiUrl, log);
     await pool.end();
     return;
   }
@@ -253,6 +255,7 @@ async function main(): Promise<void> {
   await welcomePicture(db, log);
   await clientCopy(db, log);
   await homePhotos(db, config.publicApiUrl, log);
+  await catalogueV2(db, config.publicApiUrl, log);
   await pool.end();
   log('done');
 }
@@ -436,6 +439,103 @@ async function homePhotos(db: NodePgDatabase<typeof schema>, publicApiUrl: strin
   await db.update(schema.storeSettings).set({ data: { ...data, homeMedia: next, welcomePopup: welcome }, updatedAt: new Date() }).where(eq(schema.storeSettings.id, 'default'));
   await db.insert(schema.storeSettings).values({ id: HOME_PHOTOS_MARKER_ID, data: { appliedAt: new Date().toISOString() } }).onConflictDoNothing({ target: schema.storeSettings.id });
   log('home photos set: opening image, 3 slides, still image');
+}
+
+/** The client's product photos (assets/catalogue), used as supplied — no background removal. */
+interface CatalogueItem extends Omit<Look, 'file'> {
+  files: string[];
+}
+const cream: Colour = { name: 'Cream', hex: '#efe8d8' };
+const brownCheck: Colour = { name: 'Brown check', hex: '#7a6450' };
+const pink: Colour = { name: 'Pink', hex: '#f2b8d0' };
+const multi: Colour = { name: 'Multicolour', hex: '#e8505b' };
+const white: Colour = { name: 'White', hex: '#f4f2ee' };
+const blackWhite: Colour = { name: 'Black / white', hex: '#1c1c1c' };
+
+export const CATALOGUE: CatalogueItem[] = [
+  { files: ['check-blazer'], number: 'No. 101', name: 'Brown check blazer', material: 'Wool blend · Jackets', priceNaira: 185000, colour: brownCheck, sizes: MENS, collections: ['men', 'new-in'], stock: 4, daysOld: 0, description: 'A softly tailored two-button blazer in a brown check with blue and caramel lines.', details: 'Notch lapels, flap pockets, working cuff buttons and a satin lining.' },
+  { files: ['black-suit'], number: 'No. 102', name: 'Black two-piece suit', material: 'Suiting · Suits', priceNaira: 320000, colour: black, sizes: MENS, collections: ['men', 'new-in'], stock: 3, daysOld: 0, description: 'A sharp black suit with a peak lapel, finished with a burgundy pocket square and lapel pin.', details: 'Single-breasted jacket and flat-front trouser. Sold as a set.' },
+  { files: ['crystal-jacket'], number: 'No. 103', name: 'Crystal velvet bomber', material: 'Velvet with crystals · Jackets', priceNaira: 450000, colour: black, sizes: MENS, collections: ['men', 'new-in'], stock: 2, daysOld: 0, description: 'A black velvet zip bomber scattered with hand-set crystals — made for after dark.', details: 'Point collar, full zip, ribbed cuffs.' },
+  { files: ['leather-bomber'], number: 'No. 104', name: 'Black leather bomber', material: 'Leather · Jackets', priceNaira: 260000, colour: black, sizes: MENS, collections: ['men', 'new-in'], stock: 3, daysOld: 1, description: 'A supple black leather bomber with a ribbed collar and gold-tone badge.', details: 'Full zip, zip sleeve pocket, ribbed cuffs and hem.' },
+  { files: ['varsity-jacket'], number: 'No. 105', name: 'Black and white varsity jacket', material: 'Wool blend · Jackets', priceNaira: 280000, colour: blackWhite, sizes: MENS, collections: ['men', 'new-in'], stock: 3, daysOld: 1, description: 'A classic varsity jacket: black body, white sleeves and striped ribbing.', details: 'Press-stud front, welt pockets, embroidered chest patch.' },
+  { files: ['logo-sweatshirt', 'logo-sweatshirt-worn'], number: 'No. 106', name: 'White logo sweatshirt', material: 'Cotton fleece · Sweatshirts & hoodies', priceNaira: 175000, colour: white, sizes: MENS, collections: ['men', 'new-in'], stock: 4, daysOld: 1, description: 'A relaxed white crew-neck sweatshirt with a raised chenille logo.', details: 'Dropped shoulders, ribbed collar, cuffs and hem.' },
+  { files: ['cream-overshirt'], number: 'No. 107', name: 'Cream short-sleeve overshirt', material: 'Cotton twill · Shirts', priceNaira: 145000, colour: cream, sizes: MENS, collections: ['men', 'new-in'], stock: 5, daysOld: 2, description: 'A clean cream overshirt with steel snaps and a leather-patch chest pocket.', details: 'Point collar, short sleeves, straight hem.' },
+  { files: ['windbreaker'], number: 'No. 108', name: 'Black panelled windbreaker', material: 'Nylon · Jackets', priceNaira: 120000, colour: blackWhite, sizes: MENS, collections: ['men', 'new-in'], stock: 5, daysOld: 2, description: 'A lightweight hooded windbreaker in black with white contrast panels.', details: 'Two-way zip, zip pockets, elasticated cuffs and hem.' },
+  { files: ['pink-camo-hoodie'], number: 'No. 109', name: 'Pink camo hoodie', material: 'Cotton fleece · Sweatshirts & hoodies', priceNaira: 140000, colour: pink, sizes: MENS, collections: ['men', 'new-in'], stock: 4, daysOld: 2, description: 'A pink camouflage pullover hoodie with graphic print and sleeve badges.', details: 'Drawstring hood, kangaroo pocket, ribbed cuffs and hem.' },
+  { files: ['black-hoodie-set'], number: 'No. 110', name: 'Black zip hoodie and jogger set', material: 'Cotton fleece · Sets', priceNaira: 165000, colour: black, sizes: CLOTHING, collections: ['women', 'new-in'], stock: 4, daysOld: 0, description: 'An easy black zip hoodie with a matching wide-leg jogger.', details: 'Drawstring hood and waist, front pockets. Sold as a set.' },
+  { files: ['cream-hoodie-set'], number: 'No. 111', name: 'Cream hoodie and wide-leg set', material: 'Cotton fleece · Sets', priceNaira: 165000, colour: cream, sizes: CLOTHING, collections: ['women', 'new-in'], stock: 4, daysOld: 1, description: 'A cream cropped zip hoodie with relaxed wide-leg trousers.', details: 'Elasticated waist with drawstring. Sold as a set.' },
+  { files: ['crop-skirt-set'], number: 'No. 112', name: 'Black sweatshirt and skort set', material: 'Jersey · Sets', priceNaira: 130000, colour: black, sizes: CLOTHING, collections: ['women', 'new-in'], stock: 4, daysOld: 1, description: 'A cropped black sweatshirt with a flounced, lined skort.', details: 'Ribbed cuffs and hem; high-rise skort with built-in shorts. Sold as a set.' },
+  { files: ['print-set'], number: 'No. 113', name: 'Swirl print top and flare set', material: 'Stretch jersey · Sets', priceNaira: 95000, colour: multi, sizes: CLOTHING, collections: ['women', 'new-in'], stock: 5, daysOld: 2, description: 'A bold swirl-print racer crop top with matching flared trousers.', details: 'Soft stretch fabric, elasticated waist. Sold as a set.' },
+];
+
+/**
+ * Once per database: the client's real product photos replace the starter looks. Starter products are archived (kept
+ * for order history, gone from the shop), the cut-out collection banners made by the old seed are cleared, and the
+ * new pieces go live — photos exactly as supplied. Everything stays editable in admin → Products.
+ */
+async function catalogueV2(db: NodePgDatabase<typeof schema>, publicApiUrl: string, log: (m: string) => void): Promise<void> {
+  const [done] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, CATALOGUE_MARKER_ID)).limit(1);
+  if (done) return;
+  const dir = join(__dirname, '..', '..', 'assets', 'catalogue');
+  if (!existsSync(dir)) return;
+
+  const oldSlugs = LOOKS.map((l) => slugify(l.name));
+  const archived = await db
+    .update(schema.products)
+    .set({ status: 'ARCHIVED', updatedAt: new Date() })
+    .where(sql`${schema.products.slug} in (${sql.join(oldSlugs.map((x) => sql`${x}`), sql`, `)}) and ${schema.products.status} <> 'ARCHIVED'`)
+    .returning({ name: schema.products.name });
+  // Cut-out banners from the starter photos (built-in media); a banner the admin uploaded since is left alone.
+  const cleared = await db
+    .update(schema.collections)
+    .set({ heroImageUrl: null })
+    .where(like(schema.collections.heroImageUrl, `%${MEDIA_PATH}%`))
+    .returning({ slug: schema.collections.slug });
+
+  const collectionRows = await db.select().from(schema.collections);
+  const collectionId = new Map(collectionRows.map((c) => [c.slug, c.id]));
+  const now = Date.now();
+  let added = 0;
+  for (const item of CATALOGUE) {
+    const slug = slugify(item.name);
+    const [exists] = await db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.slug, slug)).limit(1);
+    if (exists) continue;
+    const urls: string[] = [];
+    for (const f of item.files) urls.push(await storeImage(db, publicApiUrl, join(dir, `${f}.jpg`)));
+    const priceKobo = nairaToKobo(item.priceNaira);
+    const createdAt = new Date(now - item.daysOld * DAY);
+    const matrix = generateVariantMatrix({ productNumber: item.number, colours: [item.colour], sizes: item.sizes, priceKobo, compareAtKobo: null });
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(schema.products)
+        .values({
+          slug,
+          number: item.number,
+          name: item.name,
+          material: item.material,
+          description: item.description,
+          details: item.details,
+          care: 'Follow the care label inside the garment.',
+          sizeGuide: 'CLOTHING',
+          exchangeable: true,
+          status: 'LIVE',
+          options: { colours: [item.colour], sizes: item.sizes },
+          basePriceKobo: priceKobo,
+          compareAtKobo: null,
+          lowStockThreshold: 2,
+          createdAt,
+          updatedAt: createdAt,
+        })
+        .returning({ id: schema.products.id });
+      const cols = item.collections.map((c) => collectionId.get(c)).filter((id): id is string => !!id);
+      if (cols.length) await tx.insert(schema.productCollections).values(cols.map((cid) => ({ productId: row.id, collectionId: cid })));
+      await tx.insert(schema.productImages).values(urls.map((url, i) => ({ productId: row.id, url, alt: i === 0 ? item.name : `${item.name} — worn`, colour: null, sortOrder: i })));
+      await tx.insert(schema.variants).values(matrix.map((v) => ({ ...v, productId: row.id, stock: item.stock })));
+    });
+    added++;
+  }
+  await db.insert(schema.storeSettings).values({ id: CATALOGUE_MARKER_ID, data: { appliedAt: new Date().toISOString(), added, archived: archived.map((a) => a.name) } }).onConflictDoNothing({ target: schema.storeSettings.id });
+  log(`catalogue: ${added} new products live; starter products archived: ${archived.length}; cut-out banners cleared: ${cleared.length}`);
 }
 
 if (require.main === module) {
