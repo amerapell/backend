@@ -33,8 +33,23 @@ export class CheckoutController {
   /** Return-URL page calls this; the server re-verifies with the provider. Webhook remains the source of truth. */
   @Get('verify')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  verify(@Query('reference') reference?: string) {
-    if (!reference) throw new BadRequestException('reference is required');
-    return this.payments.verifyByReference(reference);
+  verify(@Query('reference') reference?: string | string[]) {
+    return this.payments.verifyByReference(oneReference(reference));
   }
+
+  /** Customer pressed "Cancel payment" on the provider's page: re-check with the provider, then release the order. */
+  @Post('cancel')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  cancel(@Body('reference') reference?: string | string[]) {
+    return this.payments.cancelByCustomer(oneReference(reference));
+  }
+}
+
+/** A return URL can carry the reference twice (`?reference=a&reference=a`) or comma-joined; any copy will do. */
+export function oneReference(value: unknown): string {
+  const first = Array.isArray(value) ? value[0] : value;
+  const ref = typeof first === 'string' ? first.split(',')[0].trim() : '';
+  if (!ref || ref.length > 100) throw new BadRequestException('reference is required');
+  return ref;
 }

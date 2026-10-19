@@ -65,6 +65,25 @@ export class PaymentsService {
     return { order: await this.ordersView.present(fresh) };
   }
 
+  /**
+   * The customer left the provider's page without paying. Ask the provider first (a transfer may have just landed);
+   * if it is still unpaid, cancel the order now so its stock is released — the bag is untouched, so they can retry.
+   * A payment that still arrives later revives the order (markPaid handles a cancelled order).
+   */
+  async cancelByCustomer(reference: string): Promise<{ order: Order }> {
+    const order = await this.orders.findByReference(reference);
+    if (!order) throw new NotFoundException('Payment reference not found');
+    let outcome: Awaited<ReturnType<PaymentsService['confirm']>> = 'PENDING';
+    try {
+      outcome = await this.confirm(order);
+    } catch (err) {
+      this.logger.warn(`Cancel check for ${reference} failed: ${(err as Error).message}`);
+    }
+    if (outcome === 'PENDING' || outcome === 'FAILED') await this.lifecycle.cancelUnpaid(order, 'FAILED');
+    const fresh = (await this.orders.findById(order.id)) as OrderRow;
+    return { order: await this.ordersView.present(fresh) };
+  }
+
   /** PAY-5: signed, idempotent webhook handling (400 bad signature; 5xx so the provider retries on failure). */
   async handleWebhook(code: ProviderCode, rawBody: Buffer | undefined, headers: WebhookHeaders): Promise<{ ok: true; duplicate?: boolean }> {
     if (!rawBody || rawBody.length === 0) throw new BadRequestException('Empty body');

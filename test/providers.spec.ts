@@ -27,7 +27,7 @@ describe('PaystackProvider', () => {
     const p = new PaystackProvider(config, f.fn);
     const res = await p.initialize(init);
     expect(res).toEqual({ authorizationUrl: 'https://checkout.paystack.com/abc', reference: 'AP-10501-abc', providerSessionId: null });
-    expect(f.calls[0].body).toMatchObject({ amount: 18_950_000, currency: 'NGN', reference: 'AP-10501-abc', callback_url: init.callbackUrl, email: init.email });
+    expect(f.calls[0].body).toMatchObject({ amount: 18_950_000, currency: 'NGN', reference: 'AP-10501-abc', callback_url: 'https://shop.test/checkout/complete', email: init.email }); // Paystack appends ?reference= itself
     expect(f.calls[0].headers.Authorization).toBe('Bearer sk_test_x');
   });
 

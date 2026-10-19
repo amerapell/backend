@@ -226,6 +226,39 @@ describe('checkout → payment (CHK, PAY)', () => {
     expect((await h.payments.verifyByReference(payment.reference)).order.status).toBe('PENDING_PAYMENT');
   });
 
+  it('customer cancels on the payment page: the order is cancelled at once and its stock released; the bag stays', async () => {
+    const h = harness();
+    const id = await filledCart(h);
+    const { order, payment } = await h.checkout.checkout(id, dto());
+    expect(h.w.available('jacket-m')).toBe(1);
+    h.setVerify('abandoned', 0);
+    const res = await h.payments.cancelByCustomer(payment.reference);
+    expect(res.order.status).toBe('CANCELLED');
+    expect(h.w.available('jacket-m')).toBe(2);
+    expect(h.email.sent.some((m) => m.subject.includes("wasn't completed"))).toBe(false);
+    // Bag untouched — the customer can try again straight away.
+    expect((await h.checkout.quote(id, 'LEKKI_AJAH', false)).problems).toEqual([]);
+    // A payment that lands anyway still counts.
+    h.setVerify('success', order.amountDueKobo);
+    expect((await h.payments.verifyByReference(payment.reference)).order.status).toBe('PAID');
+  });
+
+  it('cancel never undoes a payment the provider already confirmed', async () => {
+    const h = harness();
+    const { order, payment } = await h.checkout.checkout(await filledCart(h), dto());
+    h.setVerify('success', order.amountDueKobo);
+    expect((await h.payments.cancelByCustomer(payment.reference)).order.status).toBe('PAID');
+  });
+
+  it('a failed payment shows as failed on the return page and keeps the order open for a retry', async () => {
+    const h = harness();
+    const { payment } = await h.checkout.checkout(await filledCart(h), dto());
+    h.setVerify('failed', 0);
+    const { order } = await h.payments.verifyByReference(payment.reference);
+    expect(order.status).toBe('PENDING_PAYMENT');
+    expect(order.payment?.status).toBe('FAILED');
+  });
+
   it('releases holds after 15 minutes and gives credit back (PAY-4)', async () => {
     const h = harness();
     const { order } = await h.checkout.checkout(await filledCart(h), dto());
@@ -480,5 +513,22 @@ describe('email verification gates email-keyed credit and exchanges', () => {
     expect(await h.exchanges.forCustomer(customer)).toHaveLength(0);
     h.verified.emailVerified = true;
     expect(await h.exchanges.forCustomer(customer)).toHaveLength(1);
+  });
+});
+
+describe('payment return URL', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { oneReference } = require('../src/checkout/checkout.controller') as typeof import('../src/checkout/checkout.controller');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { withoutReference } = require('../src/payments/paystack/paystack.provider') as typeof import('../src/payments/paystack/paystack.provider');
+
+  it('accepts a reference that arrives twice or comma-joined (Paystack appends its own)', () => {
+    expect(oneReference(['AP-10503-RlwmPNbq', 'AP-10503-RlwmPNbq'])).toBe('AP-10503-RlwmPNbq');
+    expect(oneReference('AP-10503-RlwmPNbq,AP-10503-RlwmPNbq')).toBe('AP-10503-RlwmPNbq');
+    expect(() => oneReference(undefined)).toThrow('reference is required');
+  });
+
+  it('sends Paystack a callback URL without a reference, so it is not doubled', () => {
+    expect(withoutReference('https://www.amerapelleng.com/checkout/complete?reference=AP-1-x')).toBe('https://www.amerapelleng.com/checkout/complete');
   });
 });

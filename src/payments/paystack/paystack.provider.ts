@@ -26,6 +26,18 @@ interface PaystackEnvelope<T> {
   data: T;
 }
 
+/** Paystack adds `reference` and `trxref` to the callback URL itself; a second `reference` would arrive as a list. */
+export function withoutReference(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete('reference');
+    u.searchParams.delete('trxref');
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function mapPaystackStatus(status: string | undefined): VerificationStatus {
   switch ((status ?? '').toLowerCase()) {
     case 'success':
@@ -83,7 +95,7 @@ export class PaystackProvider implements PaymentProvider {
       amount: input.amountKobo,
       currency: 'NGN',
       reference: input.reference,
-      callback_url: input.callbackUrl,
+      callback_url: withoutReference(input.callbackUrl),
       metadata: { orderNumber: input.orderNumber, orderId: input.orderId, cancel_action: input.cancelUrl },
       channels: ['card', 'bank', 'ussd', 'bank_transfer'],
     });
