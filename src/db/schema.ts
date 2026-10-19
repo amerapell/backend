@@ -397,6 +397,8 @@ export const orders = pgTable(
     paidAt: ts('paid_at'),
     deliveredAt: ts('delivered_at'),
     cancelledAt: ts('cancelled_at'),
+    /** Courier tracking number (DHL abroad), entered by the store when dispatching. */
+    trackingNumber: text('tracking_number'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

@@ -431,6 +431,14 @@ describe('admin order status (ADM-3)', () => {
     const dispatched = await h.lifecycle.adminSetStatus(order.id, 'DISPATCHED');
     expect(dispatched.status).toBe('DISPATCHED');
     expect(h.email.sent.at(-1)?.subject).toBe(`Order ${order.number} is on its way`);
+    expect(dispatched.delivery).toMatchObject({ trackingNumber: null, trackingUrl: null });
+    // Tracking added after dispatch: stored, shown on the order, and the "on its way" email goes out again with it.
+    await h.ordersRepo.setTracking(order.id, 'JD014600006281');
+    await h.lifecycle.resendStatusEmail(order.id);
+    const again = h.email.sent.at(-1)!;
+    expect(again.subject).toBe(`Order ${order.number} is on its way`);
+    expect(again.html).toContain('JD014600006281');
+    expect(again.html).not.toContain('dhl.com'); // a Lagos delivery: number shown, no DHL link
     const delivered = await h.lifecycle.adminSetStatus(order.id, 'DELIVERED');
     expect(delivered.deliveredAt).toBe(h.clock.now().toISOString());
     expect(delivered.exchangeableUntil).toBe(new Date(h.clock.now().getTime() + 7 * 86_400_000).toISOString());

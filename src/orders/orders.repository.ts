@@ -92,6 +92,7 @@ export interface OrdersRepository {
   /** Atomically: PENDING_PAYMENT → CANCELLED with holds released. False if the order was no longer pending. */
   cancelUnpaid(orderId: string, paymentStatus: PaymentStatus, at: Date): Promise<boolean>;
   updateStatus(orderId: string, status: OrderStatus, extra?: { deliveredAt?: Date; cancelledAt?: Date }): Promise<void>;
+  setTracking(orderId: string, trackingNumber: string | null): Promise<void>;
   restock(orderId: string): Promise<void>;
   findExpiredPending(now: Date, limit: number): Promise<OrderRow[]>;
   listForUser(userId: string): Promise<OrderRow[]>;
@@ -302,6 +303,10 @@ export class DrizzleOrdersRepository implements OrdersRepository {
       .from(orderNotes)
       .where(eq(orderNotes.orderId, orderId))
       .orderBy(asc(orderNotes.createdAt));
+  }
+
+  async setTracking(orderId: string, trackingNumber: string | null): Promise<void> {
+    await this.db.update(orders).set({ trackingNumber, updatedAt: new Date() }).where(eq(orders.id, orderId));
   }
 
   async addNote(orderId: string, body: string, author: string | null): Promise<void> {

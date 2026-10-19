@@ -1,6 +1,13 @@
+import { isInternationalZone } from '../common/countries';
 import type { Order } from '../common/contract';
 import type { OrderItemRow, OrderRow } from '../db/schema';
 import { exchangeableUntil } from '../exchanges/exchange-status';
+
+/** DHL Express tracking page for orders abroad; local deliveries have no public tracking page. */
+export function trackingUrl(zone: string, trackingNumber: string | null | undefined): string | null {
+  if (!trackingNumber || !isInternationalZone(zone)) return null;
+  return `https://www.dhl.com/global-en/home/tracking/tracking-express.html?submit=1&tracking-id=${encodeURIComponent(trackingNumber)}`;
+}
 
 export function toOrder(order: OrderRow, items: OrderItemRow[], exchangeWindowDays: number): Order {
   const until = exchangeableUntil(order.deliveredAt, exchangeWindowDays);
@@ -21,7 +28,14 @@ export function toOrder(order: OrderRow, items: OrderItemRow[], exchangeWindowDa
       imageUrl: i.imageUrl,
       exchangeable: i.exchangeable,
     })),
-    delivery: { zone: order.zoneCode, name: order.zoneName, feeKobo: order.deliveryKobo, address: order.address ?? null },
+    delivery: {
+      zone: order.zoneCode,
+      name: order.zoneName,
+      feeKobo: order.deliveryKobo,
+      address: order.address ?? null,
+      trackingNumber: order.trackingNumber ?? null,
+      trackingUrl: trackingUrl(order.zoneCode, order.trackingNumber),
+    },
     subtotalKobo: order.subtotalKobo,
     discountKobo: order.discountKobo,
     creditAppliedKobo: order.creditAppliedKobo,

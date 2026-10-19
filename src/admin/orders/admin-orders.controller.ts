@@ -20,6 +20,8 @@ import { renderPackingSlip } from './packing-slip';
 class UpdateOrderDto {
   @IsOptional() @IsIn(ORDER_STATUSES) status?: OrderStatus;
   @IsOptional() @IsString() @MaxLength(2000) note?: string;
+  /** Courier tracking number; '' removes it. */
+  @IsOptional() @IsString() @MaxLength(60) trackingNumber?: string;
 }
 
 const PROVIDERS: PaymentProviderName[] = ['PAYSTACK', 'BACHS', 'CREDIT'];
@@ -74,9 +76,15 @@ export class AdminOrdersController {
 
   @Patch(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateOrderDto, @CurrentUser() user: AuthUser) {
-    if (!(await this.repo.findById(id))) throw new NotFoundException('Order not found');
+    const before = await this.repo.findById(id);
+    if (!before) throw new NotFoundException('Order not found');
     if (dto.note?.trim()) await this.repo.addNote(id, dto.note.trim(), user.email);
-    if (dto.status) await this.lifecycle.adminSetStatus(id, dto.status);
+    // Tracking first, so a "Dispatched" email sent in the same save already carries it.
+    const tracking = dto.trackingNumber !== undefined ? dto.trackingNumber.replace(/\s+/g, '').toUpperCase() || null : undefined;
+    const trackingChanged = tracking !== undefined && tracking !== (before.trackingNumber ?? null);
+    if (trackingChanged) await this.repo.setTracking(id, tracking ?? null);
+    if (dto.status && dto.status !== before.status) await this.lifecycle.adminSetStatus(id, dto.status);
+    else if (trackingChanged && tracking && before.status === 'DISPATCHED') await this.lifecycle.resendStatusEmail(id);
     return this.detail(id);
   }
 

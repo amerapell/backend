@@ -174,7 +174,8 @@ export interface Order {
   email: string;
   phone: string;
   items: OrderItem[];
-  delivery: { zone: ZoneCode; name: string; feeKobo: Money; address: Address | null };
+  /** trackingUrl: DHL's tracking page for orders abroad (null for local riders / no number yet). */
+  delivery: { zone: ZoneCode; name: string; feeKobo: Money; address: Address | null; trackingNumber: string | null; trackingUrl: string | null };
   subtotalKobo: Money;
   discountKobo: Money;
   creditAppliedKobo: Money;

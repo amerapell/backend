@@ -151,11 +151,21 @@ export function orderStatusEmail(order: Order, ctx: TemplateContext, extra: { cr
                 ? `Your order is on its way with ${esc(order.delivery.name)}. DHL will contact you before delivery; any import duties in your country are paid to DHL.`
                 : `Your order is on its way. Expected: ${esc(order.delivery.name)}. Our rider will call the number on your order before delivery.`,
             ) +
+            (order.delivery.trackingNumber
+              ? paragraph(
+                  `${monoLabel('Tracking number')}<br><strong>${esc(order.delivery.trackingNumber)}</strong>` +
+                    (order.delivery.trackingUrl ? `<br><a href="${esc(order.delivery.trackingUrl)}" style="color:${BRAND.ink};">Track your parcel on DHL &rarr;</a>` : ''),
+                )
+              : '') +
             itemsTable(order) +
             addressBlock(order, ctx),
-          cta: { label: 'Track your order', url },
+          cta: order.delivery.trackingUrl ? { label: 'Track your parcel', url: order.delivery.trackingUrl } : { label: 'Track your order', url },
         }),
-        text: toText([`Order ${order.number} is on its way.`, url]),
+        text: toText([
+          `Order ${order.number} is on its way.`,
+          order.delivery.trackingNumber ? `Tracking number: ${order.delivery.trackingNumber}` : null,
+          order.delivery.trackingUrl ?? url,
+        ]),
       };
     case 'READY_FOR_PICKUP':
       return {

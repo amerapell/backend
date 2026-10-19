@@ -13,7 +13,7 @@ const order: Order = {
   email: 'ada@example.com',
   phone: '+2348031234567',
   items: [{ id: 'i1', name: 'Cropped leather jacket', number: 'No. 014', colour: 'Black', size: 'M', unitKobo: 18_500_000, quantity: 1, imageUrl: null, exchangeable: true }],
-  delivery: { zone: 'LEKKI_AJAH', name: 'Lekki – Ajah', feeKobo: 450_000, address: { fullName: 'Ada <script>', phone: '+2348031234567', state: 'Lagos', lga: 'Eti-Osa', area: 'Lekki', street: '1 Road', landmark: '' } },
+  delivery: { zone: 'LEKKI_AJAH', name: 'Lekki – Ajah', feeKobo: 450_000, address: { fullName: 'Ada <script>', phone: '+2348031234567', state: 'Lagos', lga: 'Eti-Osa', area: 'Lekki', street: '1 Road', landmark: '' }, trackingNumber: null, trackingUrl: null },
   subtotalKobo: 18_500_000,
   discountKobo: 0,
   creditAppliedKobo: 0,

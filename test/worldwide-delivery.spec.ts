@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { addressLines, normaliseAddress } from '../src/checkout/address-normaliser';
 import { computeQuote } from '../src/checkout/pricing';
 import { countryName, zoneForCountry } from '../src/common/countries';
+import { trackingUrl } from '../src/orders/order-presenter';
 import { normalizeInternationalPhone } from '../src/common/phone';
 
 const uk = { fullName: 'Ada Obi', phone: '+44 7700 900123', country: 'gb', state: '', lga: 'London', area: 'Peckham', street: '12 Rye Lane', landmark: '', postcode: 'se15 4st' };
@@ -44,5 +45,11 @@ describe('worldwide delivery (DHL)', () => {
     const base = { subtotalKobo: 50_000_000, discountKobo: 0, freeDeliveryPromo: false, freeDeliveryThresholdKobo: 30_000_000, creditAvailableKobo: 0, useCredit: false };
     expect(computeQuote({ ...base, zone: { code: 'LAGOS_ISLAND', feeKobo: 500_000 } }).deliveryKobo).toBe(0);
     expect(computeQuote({ ...base, zone: { code: 'INTL_EUROPE', feeKobo: 7_500_000 } }).deliveryKobo).toBe(7_500_000);
+  });
+
+  it('links DHL tracking only for orders abroad that have a tracking number', () => {
+    expect(trackingUrl('INTL_EUROPE', '1234567890')).toBe('https://www.dhl.com/global-en/home/tracking/tracking-express.html?submit=1&tracking-id=1234567890');
+    expect(trackingUrl('INTL_EUROPE', null)).toBeNull();
+    expect(trackingUrl('LAGOS_ISLAND', '1234567890')).toBeNull();
   });
 });

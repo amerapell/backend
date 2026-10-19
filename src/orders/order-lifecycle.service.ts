@@ -61,6 +61,12 @@ export class OrderLifecycleService {
     if (order.status === 'PENDING_PAYMENT') await this.repo.setPayment(order.id, { paymentStatus: status });
   }
 
+  /** Tracking number added after the order was already dispatched: send the "Dispatched" email again with it. */
+  async resendStatusEmail(orderId: string): Promise<void> {
+    const order = await this.orders.byId(orderId);
+    await this.notifications.orderStatusChanged(order);
+  }
+
   /** ADM-3: admin status change; every step emails the customer (store gets a hidden copy). */
   async adminSetStatus(orderId: string, status: OrderStatus): Promise<Order> {
     const order = await this.repo.findById(orderId);

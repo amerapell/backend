@@ -135,6 +135,7 @@ export class InMemoryOrdersRepository implements OrdersRepository {
       paidAt: null,
       deliveredAt: null,
       cancelledAt: null,
+      trackingNumber: null,
       createdAt: input.now,
       updatedAt: input.now,
     };
@@ -217,6 +218,10 @@ export class InMemoryOrdersRepository implements OrdersRepository {
   }
   async notes(orderId: string) {
     return this.notesList.filter((n) => n.orderId === orderId);
+  }
+  async setTracking(orderId: string, trackingNumber: string | null) {
+    const o = this.orders.find((x) => x.id === orderId);
+    if (o) o.trackingNumber = trackingNumber;
   }
   async addNote(orderId: string, body: string, author: string | null) {
     this.notesList.push({ orderId, id: createId(), body, author, createdAt: this.clock.now() });
