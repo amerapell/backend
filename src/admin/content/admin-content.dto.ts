@@ -70,6 +70,24 @@ export class WelcomePopupDto {
   @IsOptional() @IsString() @MaxLength(2000) imageUrl?: string | null;
 }
 
+export class HomeImageDto {
+  @IsString() @IsNotEmpty() @MaxLength(2000) url: string;
+  @IsOptional() @IsIn(['left', 'center', 'right']) focus?: 'left' | 'center' | 'right';
+}
+
+export class HomePanelDto {
+  @IsOptional() @IsArray() @ArrayMaxSize(8) @ValidateNested({ each: true }) @Type(() => HomeImageDto) images?: HomeImageDto[];
+  @IsOptional() @IsString() @MaxLength(80) title?: string;
+  @IsOptional() @IsString() @MaxLength(60) linkLabel?: string;
+  @IsOptional() @IsString() @Matches(/^\/[^\s]*$/, { message: 'Link must be a page on this site, starting with /' }) @MaxLength(200) href?: string;
+}
+
+export class HomeMediaDto {
+  @IsOptional() @ValidateNested() @Type(() => HomePanelDto) hero?: HomePanelDto;
+  @IsOptional() @ValidateNested() @Type(() => HomePanelDto) slides?: HomePanelDto;
+  @IsOptional() @ValidateNested() @Type(() => HomePanelDto) still?: HomePanelDto;
+}
+
 export class UpdateSettingsDto {
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(80) storeName?: string;
   @IsOptional() @IsString() @MaxLength(300) pickupAddress?: string;
@@ -87,6 +105,7 @@ export class UpdateSettingsDto {
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(80, { each: true }) tickerText?: string[];
   @IsOptional() @ValidateNested() @Type(() => ServiceImagesDto) serviceImages?: ServiceImagesDto;
   @IsOptional() @ValidateNested() @Type(() => WelcomePopupDto) welcomePopup?: WelcomePopupDto;
+  @IsOptional() @ValidateNested() @Type(() => HomeMediaDto) homeMedia?: HomeMediaDto;
   @IsOptional() @ValidateNested() @Type(() => DropDto) drop?: DropDto | null;
 }
 

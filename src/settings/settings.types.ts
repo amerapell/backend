@@ -26,6 +26,11 @@ export const DEFAULT_SETTINGS: StoredSettings = {
     text: "Let's keep in touch. Be the first to discover new pieces and hear about private events at our Lagos store.",
     imageUrl: null,
   },
+  homeMedia: {
+    hero: { images: [], title: 'Where Fashion Meets Distinction', linkLabel: 'Discover the collection', href: '/c/new-in' },
+    slides: { images: [], title: 'A World of Style', linkLabel: 'Shop New In', href: '/c/new-in' },
+    still: { images: [], title: 'The Art of Curation', linkLabel: 'Read our story', href: '/about' },
+  },
   drop: null,
 };
 

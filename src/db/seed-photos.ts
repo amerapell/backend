@@ -29,6 +29,7 @@ const SIMPLIFY_MARKER_ID = 'seed:simplify-v1';
 const STORE_DETAILS_MARKER_ID = 'seed:store-details-v1';
 const WELCOME_MARKER_ID = 'seed:welcome-popup-v1';
 const CLIENT_COPY_MARKER_ID = 'seed:client-copy-v1';
+const HOME_PHOTOS_MARKER_ID = 'seed:home-photos-v1';
 const DAY = 86_400_000;
 const CLOTHING = ['XS', 'S', 'M', 'L', 'XL'];
 const MENS = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -137,6 +138,22 @@ function assetsDir(): string {
   return join(__dirname, '..', '..', 'assets', 'placeholders');
 }
 
+/** Puts one image file into the built-in media store (resized variants) and returns its public URL. */
+async function storeImage(db: NodePgDatabase<typeof schema>, publicApiUrl: string, path: string): Promise<string> {
+  const processed = await new ImageProcessor().process(readFileSync(path));
+  const id = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(schema.mediaFiles)
+      .values({ ownerKind: 'product', originalFilename: path.split('/').pop() ?? 'image.jpg', width: processed.width, height: processed.height })
+      .returning({ id: schema.mediaFiles.id });
+    await tx.insert(schema.mediaVariants).values(
+      processed.variants.map((v) => ({ mediaId: row.id, width: v.width, mime: v.mime, bytes: v.bytes, byteSize: v.bytes.length })),
+    );
+    return row.id;
+  });
+  return `${publicApiUrl.replace(/\/$/, '')}${MEDIA_PATH}${id}`;
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const pool = createPool(config.databaseUrl);
@@ -152,6 +169,7 @@ async function main(): Promise<void> {
     await storeDetails(db, log);
     await welcomePicture(db, log);
     await clientCopy(db, log);
+    await homePhotos(db, config.publicApiUrl, log);
     await pool.end();
     return;
   }
@@ -162,22 +180,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const processor = new ImageProcessor();
-  const base = config.publicApiUrl.replace(/\/$/, '');
-  const upload = async (file: string): Promise<string> => {
-    const processed = await processor.process(readFileSync(join(dir, `${file}.jpg`)));
-    const id = await db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(schema.mediaFiles)
-        .values({ ownerKind: 'product', originalFilename: `${file}.jpg`, width: processed.width, height: processed.height })
-        .returning({ id: schema.mediaFiles.id });
-      await tx.insert(schema.mediaVariants).values(
-        processed.variants.map((v) => ({ mediaId: row.id, width: v.width, mime: v.mime, bytes: v.bytes, byteSize: v.bytes.length })),
-      );
-      return row.id;
-    });
-    return `${base}${MEDIA_PATH}${id}`;
-  };
+  const upload = (file: string): Promise<string> => storeImage(db, config.publicApiUrl, join(dir, `${file}.jpg`));
 
   const collectionRows = await db.select().from(schema.collections);
   const collectionId = new Map(collectionRows.map((c) => [c.slug, c.id]));
@@ -249,6 +252,7 @@ async function main(): Promise<void> {
   await storeDetails(db, log);
   await welcomePicture(db, log);
   await clientCopy(db, log);
+  await homePhotos(db, config.publicApiUrl, log);
   await pool.end();
   log('done');
 }
@@ -398,6 +402,40 @@ async function clientCopy(db: NodePgDatabase<typeof schema>, log: (m: string) =>
   }
   await db.insert(schema.storeSettings).values({ id: CLIENT_COPY_MARKER_ID, data: { appliedAt: new Date().toISOString() } }).onConflictDoNothing({ target: schema.storeSettings.id });
   log('client copy applied: home introduction, About page, FAQ and collection descriptions');
+}
+
+/**
+ * Once per database: the home page campaign photos (assets/home) — opening image, slideshow and still image — and the
+ * welcome pop-up picture, unless the admin has already set their own. All replaceable in admin → Settings.
+ */
+async function homePhotos(db: NodePgDatabase<typeof schema>, publicApiUrl: string, log: (m: string) => void): Promise<void> {
+  const [done] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, HOME_PHOTOS_MARKER_ID)).limit(1);
+  if (done) return;
+  const dir = join(__dirname, '..', '..', 'assets', 'home');
+  const [row] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, 'default')).limit(1);
+  if (!existsSync(dir) || !row) return;
+  const data = row.data as Record<string, unknown>;
+  const media = (data.homeMedia ?? DEFAULT_SETTINGS.homeMedia) as typeof DEFAULT_SETTINGS.homeMedia;
+  const put = (file: string) => storeImage(db, publicApiUrl, join(dir, `${file}.jpg`));
+  const right = 'right' as const;
+  const next = {
+    hero: { ...DEFAULT_SETTINGS.homeMedia.hero, ...media.hero },
+    slides: { ...DEFAULT_SETTINGS.homeMedia.slides, ...media.slides },
+    still: { ...DEFAULT_SETTINGS.homeMedia.still, ...media.still },
+  };
+  if (!next.hero.images?.length) next.hero.images = [{ url: await put('hero-suit'), focus: right }];
+  if (!next.slides.images?.length) {
+    next.slides.images = [];
+    for (const f of ['slide-denim', 'slide-track', 'slide-black-set']) next.slides.images.push({ url: await put(f), focus: right });
+  }
+  if (!next.still.images?.length) next.still.images = [{ url: await put('still-bag'), focus: right }];
+  // The welcome pop-up used the old drop banner (a cut-out on grey) — the still life suits it better.
+  const welcome = { ...DEFAULT_SETTINGS.welcomePopup, ...((data.welcomePopup ?? {}) as Record<string, unknown>) };
+  const [drop] = await db.select({ url: schema.collections.heroImageUrl }).from(schema.collections).where(eq(schema.collections.slug, DROP_SLUG)).limit(1);
+  if (!welcome.imageUrl || welcome.imageUrl === drop?.url) welcome.imageUrl = next.still.images[0].url;
+  await db.update(schema.storeSettings).set({ data: { ...data, homeMedia: next, welcomePopup: welcome }, updatedAt: new Date() }).where(eq(schema.storeSettings.id, 'default'));
+  await db.insert(schema.storeSettings).values({ id: HOME_PHOTOS_MARKER_ID, data: { appliedAt: new Date().toISOString() } }).onConflictDoNothing({ target: schema.storeSettings.id });
+  log('home photos set: opening image, 3 slides, still image');
 }
 
 if (require.main === module) {
