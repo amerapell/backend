@@ -222,11 +222,21 @@ describe('AdminUploadsController', () => {
     const ctrl = new AdminUploadsController(new CloudinaryStorage(testConfig()), recording, remover);
     expect(ctrl.sign()).toEqual({ mode: 'direct', backgroundRemoval: true });
     const file = { buffer: Buffer.from('x'), mimetype: 'image/png', originalname: 'look.png' } as Express.Multer.File;
-    await expect(ctrl.image(file, 'true', 'landscape', 'true')).resolves.toEqual({ url: 'https://api.test/api/v1/media/m1', width: 1600, height: 2000, originalUrl: 'https://api.test/api/v1/media/m2' });
+    await expect(ctrl.image(file, 'true', 'landscape', 'true')).resolves.toEqual({ url: 'https://api.test/api/v1/media/m1', width: 1600, height: 2000, originalUrl: 'https://api.test/api/v1/media/m2', backgroundRemoved: true });
     expect(layouts).toEqual(['landscape']);
     expect(stored).toEqual([{ name: 'look-cutout.jpg', mime: 'image/jpeg' }, { name: 'look.png', mime: 'image/png' }]);
     const one = await ctrl.image(file, 'true');
     expect(one.originalUrl).toBeNull();
     expect(layouts[1]).toBe('portrait');
+  });
+
+  it('falls back to the photo as given when background removal breaks on the server', async () => {
+    const stored: string[] = [];
+    const uploader = { isConfigured: () => true, upload: async (f: { originalname?: string }) => (stored.push(String(f.originalname)), { url: 'https://api.test/api/v1/media/m9', width: 800, height: 1000 }) };
+    const remover = { isAvailable: () => true, cutout: async () => { throw new Error('Failed to allocate memory'); } };
+    const ctrl = new AdminUploadsController({ isConfigured: () => false } as never, uploader as never, remover as never);
+    const file = { buffer: Buffer.from('x'), mimetype: 'image/jpeg', originalname: 'coat.jpg' } as Express.Multer.File;
+    await expect(ctrl.image(file, 'true', 'portrait', 'true')).resolves.toEqual({ url: 'https://api.test/api/v1/media/m9', width: 800, height: 1000, originalUrl: null, backgroundRemoved: false });
+    expect(stored).toEqual(['coat.jpg']);
   });
 });

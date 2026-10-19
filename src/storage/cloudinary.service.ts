@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { AppConfig } from '../config/app-config';
 import { signCloudinaryParams } from './cloudinary-signature';
@@ -36,7 +36,11 @@ export class CloudinaryStorage implements StorageSigner, ImageUploader {
       const stream = cloudinary.uploader.upload_stream(
         { folder, resource_type: 'image' },
         (err?: unknown, res?: UploadApiResponse) => {
-          if (err || !res) return reject(err instanceof Error ? err : new Error('Upload failed'));
+          if (err || !res) {
+            // Cloudinary reports failures as plain objects ({ message, http_code }), not Errors — keep its reason.
+            const reason = err instanceof Error ? err.message : (err as { message?: string } | undefined)?.message;
+            return reject(new BadGatewayException(`Cloudinary refused the upload${reason ? `: ${reason}` : ''}`));
+          }
           resolve({ url: res.secure_url, width: res.width, height: res.height });
         },
       );

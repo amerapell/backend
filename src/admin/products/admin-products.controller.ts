@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Delete, Get, Header, HttpCode, Inject, NotFoundException, Param, Patch, Post, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Delete, Get, Header, HttpCode, HttpException, Inject, Logger, NotFoundException, Param, Patch, Post, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import type { ProductStatus } from '../../common/contract';
@@ -78,6 +78,8 @@ export class AdminStockController {
 
 @AdminController('uploads')
 export class AdminUploadsController {
+  private readonly log = new Logger('AdminUploads');
+
   constructor(
     @Inject(STORAGE_SIGNER) private readonly signer: StorageSigner,
     @Inject(IMAGE_UPLOADER) private readonly uploader: ImageUploader,
@@ -115,11 +117,21 @@ export class AdminUploadsController {
       return { url, width: width ?? null, height: height ?? null };
     }
     const shape: CutoutLayout = layout === 'landscape' ? 'landscape' : 'portrait';
-    const cut = await this.remover.cutout(file.buffer, shape);
+    let cut: Buffer;
+    try {
+      cut = await this.remover.cutout(file.buffer, shape);
+    } catch (err) {
+      // A bad file is the admin's to fix; anything else (e.g. the server running out of memory for the model)
+      // must not lose the upload — store the photo as given and say so.
+      if (err instanceof HttpException && err.getStatus() < 500) throw err;
+      this.log.warn(`Background removal failed, storing the photo as given: ${(err as Error).message}`);
+      const { url, width, height } = await this.uploader.upload(file, 'amerapelle/products');
+      return { url, width: width ?? null, height: height ?? null, originalUrl: null, backgroundRemoved: false };
+    }
     const base = (file.originalname || 'photo').replace(/\.\w+$/, '');
     const stored = await this.uploader.upload({ buffer: cut, mimetype: 'image/jpeg', originalname: `${base}-cutout.jpg` }, 'amerapelle/products');
     const original = keepOriginal === 'true' ? await this.uploader.upload(file, 'amerapelle/products') : null;
-    return { url: stored.url, width: stored.width ?? null, height: stored.height ?? null, originalUrl: original?.url ?? null };
+    return { url: stored.url, width: stored.width ?? null, height: stored.height ?? null, originalUrl: original?.url ?? null, backgroundRemoved: true };
   }
 }
 
