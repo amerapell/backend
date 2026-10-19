@@ -32,7 +32,7 @@ export type AdminProduct = Product & {
   collectionIds: string[];
   seoTitle: string | null;
   seoDescription: string | null;
-  imagesDetailed: { id: string; url: string; alt: string; colour: string | null }[];
+  imagesDetailed: { id: string; url: string; alt: string; colour: string | null; scale: number }[];
 };
 
 /** ADM-1/ADM-2: product CRUD with variant matrix generation, archive, stock CSV. */
@@ -84,7 +84,7 @@ export class AdminProductsService {
       collectionIds: agg.collections.map((c) => c.id),
       seoTitle: p.seoTitle,
       seoDescription: p.seoDescription,
-      imagesDetailed: [...agg.images].sort((a, b) => a.sortOrder - b.sortOrder).map((i) => ({ id: i.id, url: i.url, alt: i.alt, colour: i.colour })),
+      imagesDetailed: [...agg.images].sort((a, b) => a.sortOrder - b.sortOrder).map((i) => ({ id: i.id, url: i.url, alt: i.alt, colour: i.colour, scale: i.scale })),
     };
   }
 

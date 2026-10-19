@@ -8,7 +8,7 @@ import type { MatrixVariant } from '../../catalogue/variant-matrix';
 export const ADMIN_PRODUCTS_REPOSITORY = Symbol('ADMIN_PRODUCTS_REPOSITORY');
 
 export type ProductFields = Omit<ProductRow, 'id' | 'createdAt' | 'updatedAt'>;
-export type ImageInput = { url: string; alt: string; colour?: string | null };
+export type ImageInput = { url: string; alt: string; colour?: string | null; scale?: number };
 
 export interface VariantChanges {
   keep: { id: string; colourHex: string | null; position: number }[];
@@ -62,7 +62,7 @@ export class DrizzleAdminProductsRepository implements AdminProductsRepository {
       const [p] = await tx.insert(products).values(fields).returning({ id: products.id });
       if (collectionIds.length) await tx.insert(productCollections).values(collectionIds.map((collectionId) => ({ productId: p.id, collectionId })));
       if (images.length) {
-        await tx.insert(productImages).values(images.map((i, n) => ({ productId: p.id, url: i.url, alt: i.alt, colour: i.colour ?? null, sortOrder: n })));
+        await tx.insert(productImages).values(images.map((i, n) => ({ productId: p.id, url: i.url, alt: i.alt, colour: i.colour ?? null, sortOrder: n, scale: i.scale ?? 100 })));
       }
       if (vs.length) await tx.insert(variants).values(vs.map((v) => ({ ...v, productId: p.id })));
       return p.id;
@@ -79,7 +79,7 @@ export class DrizzleAdminProductsRepository implements AdminProductsRepository {
       if (images) {
         await tx.delete(productImages).where(eq(productImages.productId, id));
         if (images.length) {
-          await tx.insert(productImages).values(images.map((i, n) => ({ productId: id, url: i.url, alt: i.alt, colour: i.colour ?? null, sortOrder: n })));
+          await tx.insert(productImages).values(images.map((i, n) => ({ productId: id, url: i.url, alt: i.alt, colour: i.colour ?? null, sortOrder: n, scale: i.scale ?? 100 })));
         }
       }
       if (changes) {

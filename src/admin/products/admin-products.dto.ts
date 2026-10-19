@@ -27,6 +27,8 @@ export class ImageDto {
   @IsUrl(IMAGE_URL_OPTIONS) url: string;
   @IsString() @MaxLength(200) alt: string;
   @IsOptional() @IsString() @MaxLength(40) colour?: string | null;
+  /** % of the frame the photo fills: 100 = edge to edge, down to 50 for a small packshot. */
+  @IsOptional() @IsInt() @Min(50) @Max(100) scale?: number;
 }
 
 export class CreateProductDto {

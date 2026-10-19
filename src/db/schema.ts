@@ -235,6 +235,8 @@ export const productImages = pgTable(
     alt: text('alt').notNull().default(''),
     colour: text('colour'),
     sortOrder: integer('sort_order').notNull().default(0),
+    /** How much of the frame the photo fills, in %: 100 = edge to edge (worn shots); less = a packshot sitting on the stage. */
+    scale: integer('scale').notNull().default(100),
   },
   (t) => [index('product_images_product_idx').on(t.productId)],
 );

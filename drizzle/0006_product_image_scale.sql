@@ -1,0 +1,1 @@
+ALTER TABLE "product_images" ADD COLUMN "scale" integer DEFAULT 100 NOT NULL;

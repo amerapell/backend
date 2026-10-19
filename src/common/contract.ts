@@ -54,7 +54,8 @@ export interface ProductCard {
   compareAtKobo: Money | null;
   badge: Badge | null;
   lowStockCount: number | null;
-  images: { url: string; alt: string }[];
+  /** scale: % of the frame the photo fills (100 = edge to edge; lower = packshot sitting on the stage). */
+  images: { url: string; alt: string; scale: number }[];
   colours: Colour[];
   inStock: boolean;
   /** Admin flag: shown as the wide featured piece in listing grids. */

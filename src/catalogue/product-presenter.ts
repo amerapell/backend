@@ -99,7 +99,7 @@ export function toProductCard(agg: ProductAggregate, now: Date): ProductCard {
     lowStockCount,
     images: sortedImages(agg)
       .slice(0, 4)
-      .map((i) => ({ url: i.url, alt: i.alt || p.name })),
+      .map((i) => ({ url: i.url, alt: i.alt || p.name, scale: i.scale ?? 100 })),
     colours: productColours(agg),
     inStock: totalAvailable(agg) > 0,
     featured: p.featured,
@@ -131,7 +131,7 @@ export function toProduct(agg: ProductAggregate, related: ProductCard[], now: Da
   const plain = (p.seoDescription ?? p.description).replace(/\s+/g, ' ').trim();
   return {
     ...card,
-    images: images.map((i) => ({ url: i.url, alt: i.alt || p.name })),
+    images: images.map((i) => ({ url: i.url, alt: i.alt || p.name, scale: i.scale ?? 100 })),
     description: p.description,
     details: p.details,
     care: p.care,

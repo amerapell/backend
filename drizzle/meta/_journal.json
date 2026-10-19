@@ -43,6 +43,13 @@
       "when": 1792149629949,
       "tag": "0005_collection_hero",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792419341807,
+      "tag": "0006_product_image_scale",
+      "breakpoints": true
     }
   ]
 }

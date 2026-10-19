@@ -31,6 +31,7 @@ const WELCOME_MARKER_ID = 'seed:welcome-popup-v1';
 const CLIENT_COPY_MARKER_ID = 'seed:client-copy-v1';
 const HOME_PHOTOS_MARKER_ID = 'seed:home-photos-v1';
 const CATALOGUE_MARKER_ID = 'seed:catalogue-v2';
+const IMAGE_SCALE_MARKER_ID = 'seed:image-scale-v1';
 const DAY = 86_400_000;
 const CLOTHING = ['XS', 'S', 'M', 'L', 'XL'];
 const MENS = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -172,6 +173,7 @@ async function main(): Promise<void> {
     await clientCopy(db, log);
     await homePhotos(db, config.publicApiUrl, log);
     await catalogueV2(db, config.publicApiUrl, log);
+    await imageScale(db, log);
     await pool.end();
     return;
   }
@@ -256,6 +258,7 @@ async function main(): Promise<void> {
   await clientCopy(db, log);
   await homePhotos(db, config.publicApiUrl, log);
   await catalogueV2(db, config.publicApiUrl, log);
+  await imageScale(db, log);
   await pool.end();
   log('done');
 }
@@ -452,6 +455,11 @@ const multi: Colour = { name: 'Multicolour', hex: '#e8505b' };
 const white: Colour = { name: 'White', hex: '#f4f2ee' };
 const blackWhite: Colour = { name: 'Black / white', hex: '#1c1c1c' };
 
+/** Photos of a person in a real setting fill the frame; flat packshots on white sit smaller on the stage. */
+const WORN_SHOTS = new Set(['crystal-jacket', 'leather-bomber', 'cream-hoodie-set', 'logo-sweatshirt-worn']);
+export const PACKSHOT_SCALE = 78;
+const scaleFor = (file: string) => (WORN_SHOTS.has(file) ? 100 : PACKSHOT_SCALE);
+
 export const CATALOGUE: CatalogueItem[] = [
   { files: ['check-blazer'], number: 'No. 101', name: 'Brown check blazer', material: 'Wool blend · Jackets', priceNaira: 185000, colour: brownCheck, sizes: MENS, collections: ['men', 'new-in'], stock: 4, daysOld: 0, description: 'A softly tailored two-button blazer in a brown check with blue and caramel lines.', details: 'Notch lapels, flap pockets, working cuff buttons and a satin lining.' },
   { files: ['black-suit'], number: 'No. 102', name: 'Black two-piece suit', material: 'Suiting · Suits', priceNaira: 320000, colour: black, sizes: MENS, collections: ['men', 'new-in'], stock: 3, daysOld: 0, description: 'A sharp black suit with a peak lapel, finished with a burgundy pocket square and lapel pin.', details: 'Single-breasted jacket and flat-front trouser. Sold as a set.' },
@@ -529,13 +537,35 @@ async function catalogueV2(db: NodePgDatabase<typeof schema>, publicApiUrl: stri
         .returning({ id: schema.products.id });
       const cols = item.collections.map((c) => collectionId.get(c)).filter((id): id is string => !!id);
       if (cols.length) await tx.insert(schema.productCollections).values(cols.map((cid) => ({ productId: row.id, collectionId: cid })));
-      await tx.insert(schema.productImages).values(urls.map((url, i) => ({ productId: row.id, url, alt: i === 0 ? item.name : `${item.name} — worn`, colour: null, sortOrder: i })));
+      await tx.insert(schema.productImages).values(urls.map((url, i) => ({ productId: row.id, url, alt: i === 0 ? item.name : `${item.name} — worn`, colour: null, sortOrder: i, scale: scaleFor(item.files[i]) })));
       await tx.insert(schema.variants).values(matrix.map((v) => ({ ...v, productId: row.id, stock: item.stock })));
     });
     added++;
   }
   await db.insert(schema.storeSettings).values({ id: CATALOGUE_MARKER_ID, data: { appliedAt: new Date().toISOString(), added, archived: archived.map((a) => a.name) } }).onConflictDoNothing({ target: schema.storeSettings.id });
   log(`catalogue: ${added} new products live; starter products archived: ${archived.length}; cut-out banners cleared: ${cleared.length}`);
+}
+
+/** Once per database: catalogue packshots (added before image sizes existed) sit smaller in their frame. */
+async function imageScale(db: NodePgDatabase<typeof schema>, log: (m: string) => void): Promise<void> {
+  const [done] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, IMAGE_SCALE_MARKER_ID)).limit(1);
+  if (done) return;
+  let changed = 0;
+  for (const item of CATALOGUE) {
+    const [p] = await db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.slug, slugify(item.name))).limit(1);
+    if (!p) continue;
+    for (const [i, file] of item.files.entries()) {
+      if (scaleFor(file) === 100) continue;
+      const rows = await db
+        .update(schema.productImages)
+        .set({ scale: scaleFor(file) })
+        .where(and(eq(schema.productImages.productId, p.id), eq(schema.productImages.sortOrder, i), eq(schema.productImages.scale, 100)))
+        .returning({ id: schema.productImages.id });
+      changed += rows.length;
+    }
+  }
+  await db.insert(schema.storeSettings).values({ id: IMAGE_SCALE_MARKER_ID, data: { appliedAt: new Date().toISOString(), changed } }).onConflictDoNothing({ target: schema.storeSettings.id });
+  log(`product packshots set to ${PACKSHOT_SCALE}% of their frame: ${changed}`);
 }
 
 if (require.main === module) {
