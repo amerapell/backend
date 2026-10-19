@@ -176,9 +176,13 @@ describe('email verification (sign-up)', () => {
     expect(verified).toMatchObject({ id: user.id, emailVerified: true });
     expect(h.users.users[0].emailVerifiedAt).toEqual(h.clock.now());
     expect(h.claimed).toEqual([{ userId: user.id, email: 'ada@example.com' }]);
-    // Clicking the same link again returns the (already verified) user instead of an error.
+    const welcome = h.email.sent.at(-1)!;
+    expect(welcome).toMatchObject({ to: 'ada@example.com', subject: 'Welcome to Amerapelle' });
+    expect(welcome.bcc).toBeUndefined();
+    // Clicking the same link again returns the (already verified) user instead of an error — and no second welcome.
     await expect(h.auth.verifyEmail(token)).resolves.toMatchObject({ emailVerified: true });
     expect(h.claimed).toHaveLength(1);
+    expect(h.email.sent.filter((m) => m.subject === 'Welcome to Amerapelle')).toHaveLength(1);
   });
 
   it('rejects unknown and expired links with 400', async () => {
@@ -199,9 +203,10 @@ describe('email verification (sign-up)', () => {
     expect(await h.auth.resendVerification(user.id)).toEqual({ ok: true, sent: true });
     expect(h.email.sent).toHaveLength(2);
     await h.auth.verifyEmail(h.lastLinkToken()!);
+    expect(h.email.sent).toHaveLength(3); // + the welcome email
     h.clock.advance(61_000);
     expect(await h.auth.resendVerification(user.id)).toEqual({ ok: true, sent: false });
-    expect(h.email.sent).toHaveLength(2);
+    expect(h.email.sent).toHaveLength(3);
   });
 
   it('credit tied to the email is hidden until the account is verified', async () => {
@@ -241,6 +246,10 @@ describe('Google sign-in', () => {
     expect(row).toMatchObject({ role: 'CUSTOMER', googleSub: 'g-123' });
     expect(await plainHasher.verify('', row.passwordHash)).toBe(false);
     expect(h.claimed).toEqual([{ userId: row.id, email: 'ada@example.com' }]);
+    expect(h.email.sent.map((m) => m.subject)).toEqual(['Welcome to Amerapelle']);
+    // Signing in with Google again is not a new account: no second welcome.
+    await h.auth.googleSignIn('cred');
+    expect(h.email.sent).toHaveLength(1);
     // Next time: found by sub, same account.
     expect((await h.auth.googleSignIn('cred')).user.id).toBe(row.id);
     expect(h.users.users).toHaveLength(1);

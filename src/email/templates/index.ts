@@ -404,3 +404,71 @@ export function passwordChangedEmail(firstName: string, ctx: TemplateContext): R
     text: toText(['Your Amerapelle password was changed. If this was not you, reset it and contact us.']),
   };
 }
+
+/** After a customer confirms their email (or first signs in with Google). */
+export function welcomeEmail(firstName: string, ctx: TemplateContext): RenderedEmail {
+  return {
+    subject: 'Welcome to Amerapelle',
+    html: renderLayout({
+      preheader: 'Your account is ready.',
+      eyebrow: 'Welcome',
+      headlineHtml: 'Welcome to <em>Amerapelle.</em>',
+      bodyHtml:
+        paragraph(`Hi ${esc(firstName || 'there')}, your account is ready.`) +
+        paragraph('AMERAPELLE is a luxury multi-brand fashion house — fashion, statement handbags, footwear and accessories, curated for those who dress with intention.') +
+        paragraph('From your account you can track orders, save pieces to your wishlist and request exchanges.') +
+        paragraph(`Need help with sizing or styling? Message a stylist on WhatsApp (${esc(ctx.settings.whatsappNumber)})${ctx.settings.pickupAddress ? `, or visit us at ${esc(ctx.settings.pickupAddress)}` : ''}.`),
+      cta: { label: 'Discover New In', url: `${ctx.frontendUrl}/c/new-in` },
+    }),
+    text: toText([`Welcome to Amerapelle, ${firstName || 'there'}. Your account is ready.`, `Discover New In: ${ctx.frontendUrl}/c/new-in`]),
+  };
+}
+
+/** Footer / welcome pop-up newsletter sign-up. */
+export function newsletterWelcomeEmail(ctx: TemplateContext): RenderedEmail {
+  return {
+    subject: "You're on the Amerapelle list",
+    html: renderLayout({
+      preheader: 'Thank you for signing up.',
+      eyebrow: 'Amerapelle News',
+      headlineHtml: "You're on the <em>list.</em>",
+      bodyHtml:
+        paragraph('Thank you for signing up. You will be the first to hear about new arrivals, private sales and events at our Lagos store.') +
+        paragraph('Changed your mind? Reply to this email with "unsubscribe", or untick the newsletter in your account, and we will take you off the list.'),
+      cta: { label: 'Discover New In', url: `${ctx.frontendUrl}/c/new-in` },
+    }),
+    text: toText(["You're on the Amerapelle list.", `Discover New In: ${ctx.frontendUrl}/c/new-in`, 'Reply "unsubscribe" to stop.']),
+  };
+}
+
+export interface BackInStockItem {
+  productName: string;
+  productSlug: string;
+  colour: string | null;
+  size: string | null;
+  priceKobo: number;
+  imageUrl: string | null;
+}
+
+/** "Notify me when available" — the size the customer asked for is back. */
+export function backInStockEmail(item: BackInStockItem, ctx: TemplateContext): RenderedEmail {
+  const url = `${ctx.frontendUrl}/p/${encodeURIComponent(item.productSlug)}`;
+  const option = [item.colour, item.size ? `Size ${item.size}` : null].filter(Boolean).join(' · ');
+  const image = item.imageUrl
+    ? `<p style="margin:0 0 20px;"><a href="${esc(url)}"><img src="${esc(item.imageUrl)}${item.imageUrl.includes('?') ? '&' : '?'}w=480" alt="${esc(item.productName)}" width="240" style="display:block;width:240px;max-width:100%;height:auto;border:0;background:${BRAND.hair};"></a></p>`
+    : '';
+  return {
+    subject: `Back in stock: ${item.productName}`,
+    html: renderLayout({
+      preheader: `${item.productName}${item.size ? ` in ${item.size}` : ''} is available again.`,
+      eyebrow: 'Back in stock',
+      headlineHtml: 'It is <em>back.</em>',
+      bodyHtml:
+        image +
+        paragraph(`<strong>${esc(item.productName)}</strong>${option ? `<br>${esc(option)}` : ''}<br>${formatNaira(item.priceKobo)}`) +
+        paragraph('You asked us to tell you when this was available again. Pieces are in small numbers, so it may not stay long.'),
+      cta: { label: 'Shop it now', url },
+    }),
+    text: toText([`Back in stock: ${item.productName}${option ? ` (${option})` : ''} — ${formatNaira(item.priceKobo)}`, url]),
+  };
+}

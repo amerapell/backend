@@ -47,7 +47,9 @@ export class ContentService {
 
   async newsletter(email: string, consent: boolean, source = 'newsletter') {
     if (consent !== true) throw new BadRequestException('Marketing consent is required to subscribe');
+    const already = await this.repo.isSubscribed(email.trim());
     await this.repo.subscribe(email.trim(), true, source);
+    if (!already) await this.notifications.newsletterJoined(email.trim().toLowerCase());
     return { ok: true as const };
   }
 

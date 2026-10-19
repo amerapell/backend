@@ -21,6 +21,10 @@ import {
   passwordResetEmail,
   TemplateContext,
   verifyEmailEmail,
+  welcomeEmail,
+  newsletterWelcomeEmail,
+  backInStockEmail,
+  type BackInStockItem,
 } from './templates';
 
 /**
@@ -114,6 +118,19 @@ export class NotificationsService {
   async verifyEmail(email: string, firstName: string, token: string): Promise<void> {
     const link = `${this.config.values.frontendUrl}/account?view=verify&token=${encodeURIComponent(token)}`;
     await this.deliver(email, verifyEmailEmail(firstName, link));
+  }
+
+  /** Account confirmed (or created with Google). Marketing-free, so no store copy. */
+  async welcome(email: string, firstName: string): Promise<void> {
+    await this.deliver(email, welcomeEmail(firstName, await this.ctx()));
+  }
+
+  async newsletterJoined(email: string): Promise<void> {
+    await this.deliver(email, newsletterWelcomeEmail(await this.ctx()));
+  }
+
+  async backInStock(email: string, item: BackInStockItem): Promise<void> {
+    await this.deliver(email, backInStockEmail(item, await this.ctx()));
   }
 
   async contactForm(msg: ContactMessageInput): Promise<void> {

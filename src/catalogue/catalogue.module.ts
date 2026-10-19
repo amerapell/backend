@@ -3,6 +3,7 @@ import { CatalogueController } from './catalogue.controller';
 import { CatalogueService } from './catalogue.service';
 import { CATALOGUE_REPOSITORY, DrizzleCatalogueRepository } from './catalogue.repository';
 import { DrizzleInventoryRepository, INVENTORY_REPOSITORY } from './inventory.repository';
+import { BACK_IN_STOCK_REPOSITORY, BackInStockService, DrizzleBackInStockRepository } from './back-in-stock';
 import { DrizzleStockNotifyRepository, STOCK_NOTIFY_REPOSITORY, StockNotifyService } from './stock-notify';
 
 @Module({
@@ -10,6 +11,8 @@ import { DrizzleStockNotifyRepository, STOCK_NOTIFY_REPOSITORY, StockNotifyServi
   providers: [
     CatalogueService,
     StockNotifyService,
+    BackInStockService,
+    { provide: BACK_IN_STOCK_REPOSITORY, useClass: DrizzleBackInStockRepository },
     { provide: STOCK_NOTIFY_REPOSITORY, useClass: DrizzleStockNotifyRepository },
     { provide: CATALOGUE_REPOSITORY, useClass: DrizzleCatalogueRepository },
     { provide: INVENTORY_REPOSITORY, useClass: DrizzleInventoryRepository },

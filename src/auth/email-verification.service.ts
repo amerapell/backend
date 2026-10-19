@@ -64,7 +64,10 @@ export class EmailVerificationService {
     const wasVerified = !!user.emailVerifiedAt;
     const patch = { ...extra, ...(wasVerified ? {} : { emailVerifiedAt: this.clock.now() }) };
     const updated = Object.keys(patch).length ? ((await this.users.update(user.id, patch)) ?? { ...user, ...patch }) : user;
-    if (!wasVerified && updated.role === 'CUSTOMER') await this.orders.claimGuestOrders(updated.id, updated.email);
+    if (!wasVerified && updated.role === 'CUSTOMER') {
+      await this.orders.claimGuestOrders(updated.id, updated.email);
+      await this.notifications.welcome(updated.email, updated.firstName);
+    }
     return updated;
   }
 }
