@@ -20,7 +20,7 @@ import { ImageProcessor } from '../storage/image-processor';
 import { MEDIA_PATH } from '../storage/database-image.storage';
 import { createPool } from './database.module';
 import * as schema from './schema';
-import { ABOUT_MARKDOWN, COLLECTIONS, DROP_SLUG, FAQ, HOME_INTRO } from './seed-data';
+import { ABOUT_MARKDOWN, COLLECTIONS, DROP_SLUG, EXCHANGES_INTRO, EXCHANGES_TITLE, FAQ, HOME_INTRO, TICKER_TEXT } from './seed-data';
 import { DEFAULT_SETTINGS } from '../settings/settings.types';
 
 const MARKER_ID = 'seed:placeholder-photos-v1';
@@ -32,6 +32,7 @@ const CLIENT_COPY_MARKER_ID = 'seed:client-copy-v1';
 const HOME_PHOTOS_MARKER_ID = 'seed:home-photos-v1';
 const CATALOGUE_MARKER_ID = 'seed:catalogue-v2';
 const IMAGE_SCALE_MARKER_ID = 'seed:image-scale-v1';
+const WORDING_MARKER_ID = 'seed:wording-v1';
 const DAY = 86_400_000;
 const CLOTHING = ['XS', 'S', 'M', 'L', 'XL'];
 const MENS = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -174,6 +175,7 @@ async function main(): Promise<void> {
     await homePhotos(db, config.publicApiUrl, log);
     await catalogueV2(db, config.publicApiUrl, log);
     await imageScale(db, log);
+    await wording(db, log);
     await pool.end();
     return;
   }
@@ -259,6 +261,7 @@ async function main(): Promise<void> {
   await homePhotos(db, config.publicApiUrl, log);
   await catalogueV2(db, config.publicApiUrl, log);
   await imageScale(db, log);
+  await wording(db, log);
   await pool.end();
   log('done');
 }
@@ -306,7 +309,7 @@ async function simplify(db: NodePgDatabase<typeof schema>, log: (m: string) => v
     const data = { ...(row.data as Record<string, unknown>) };
     data.drop = null;
     data.bachsEnabled = false;
-    data.tickerText = ['Delivery across Nigeria · Exchange, never a refund'];
+    data.tickerText = [TICKER_TEXT];
     await db.update(schema.storeSettings).set({ data, updatedAt: new Date() }).where(eq(schema.storeSettings.id, 'default'));
   }
   const drops = await db
@@ -566,6 +569,39 @@ async function imageScale(db: NodePgDatabase<typeof schema>, log: (m: string) =>
   }
   await db.insert(schema.storeSettings).values({ id: IMAGE_SCALE_MARKER_ID, data: { appliedAt: new Date().toISOString(), changed } }).onConflictDoNothing({ target: schema.storeSettings.id });
   log(`product packshots set to ${PACKSHOT_SCALE}% of their frame: ${changed}`);
+}
+
+/**
+ * Once per database: the client's softer wording — "Your satisfaction, our priority" and "Our Exchange Promise" in
+ * place of "Exchange, never a refund" / "no refunds". Only text still exactly as the old seed wrote it is changed.
+ */
+async function wording(db: NodePgDatabase<typeof schema>, log: (m: string) => void): Promise<void> {
+  const [done] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, WORDING_MARKER_ID)).limit(1);
+  if (done) return;
+  const changed: string[] = [];
+  const [row] = await db.select().from(schema.storeSettings).where(eq(schema.storeSettings.id, 'default')).limit(1);
+  const ticker = (row?.data as { tickerText?: string[] } | undefined)?.tickerText ?? [];
+  if (row && ticker.length === 1 && ticker[0] === 'Delivery across Nigeria · Exchange, never a refund') {
+    await db.update(schema.storeSettings).set({ data: { ...(row.data as Record<string, unknown>), tickerText: [TICKER_TEXT] }, updatedAt: new Date() }).where(eq(schema.storeSettings.id, 'default'));
+    changed.push('top bar');
+  }
+  const oldIntro = '# Exchange, not refund\n\n**We do not offer refunds.** Instead, every eligible piece can be exchanged for credit.';
+  const [ex] = await db.select().from(schema.pages).where(eq(schema.pages.slug, 'exchanges')).limit(1);
+  if (ex) {
+    const title = ex.title === 'Exchanges — no refunds' ? EXCHANGES_TITLE : ex.title;
+    const body = ex.bodyMarkdown.replace(/\r\n/g, '\n').replace(oldIntro, EXCHANGES_INTRO);
+    if (title !== ex.title || body !== ex.bodyMarkdown) {
+      await db.update(schema.pages).set({ title, bodyMarkdown: body, updatedAt: new Date() }).where(eq(schema.pages.slug, 'exchanges'));
+      changed.push('exchanges page');
+    }
+  }
+  const [terms] = await db.select().from(schema.pages).where(eq(schema.pages.slug, 'terms')).limit(1);
+  if (terms?.bodyMarkdown.includes('**Exchanges, not refunds.**')) {
+    await db.update(schema.pages).set({ bodyMarkdown: terms.bodyMarkdown.replace('**Exchanges, not refunds.**', '**Our Exchange Promise.**'), updatedAt: new Date() }).where(eq(schema.pages.slug, 'terms'));
+    changed.push('terms');
+  }
+  await db.insert(schema.storeSettings).values({ id: WORDING_MARKER_ID, data: { appliedAt: new Date().toISOString(), changed } }).onConflictDoNothing({ target: schema.storeSettings.id });
+  log(`wording updated: ${changed.join(', ') || 'nothing to change'}`);
 }
 
 if (require.main === module) {

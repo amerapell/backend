@@ -60,7 +60,7 @@ export function orderConfirmationEmail(order: Order, ctx: TemplateContext): Rend
         rule() +
         addressBlock(order, ctx) +
         paragraph(
-          `Exchange, not refund: unworn pieces with tags can be exchanged for credit within ${ctx.settings.exchangeWindowDays} days of delivery. <a href="${esc(ctx.frontendUrl)}/policies/exchanges" style="color:${BRAND.navy};">Read the policy</a>.`,
+          `Our Exchange Promise: unworn pieces with tags can be exchanged for credit within ${ctx.settings.exchangeWindowDays} days of delivery. <a href="${esc(ctx.frontendUrl)}/policies/exchanges" style="color:${BRAND.navy};">Read the policy</a>.`,
         ),
       cta: { label: 'View your order', url: `${ctx.frontendUrl}/account/orders/${order.number}` },
     }),

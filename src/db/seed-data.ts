@@ -413,6 +413,13 @@ Curated for those who appreciate refined taste, confident expression, and the ar
 [Discover Fashion Beyond the Ordinary.](/c/new-in)`,
 };
 
+/** Client wording for the exchanges page (clear that purchases are exchanged, not refunded — in a gentler voice). */
+export const EXCHANGES_TITLE = 'Our Exchange Promise';
+export const EXCHANGES_INTRO = `# Our Exchange Promise
+
+Your satisfaction is our priority. Every eligible piece can be exchanged for store credit — purchases are exchanged rather than refunded — so you can choose something you love.`;
+export const TICKER_TEXT = 'Delivery across Nigeria · Your satisfaction, our priority';
+
 export const PAGES: { slug: string; title: string; bodyMarkdown: string }[] = [
   { slug: 'home', ...HOME_INTRO },
   {
@@ -440,10 +447,8 @@ export const PAGES: { slug: string; title: string; bodyMarkdown: string }[] = [
   },
   {
     slug: 'exchanges',
-    title: 'Exchanges — no refunds',
-    bodyMarkdown: `# Exchange, not refund
-
-**We do not offer refunds.** Instead, every eligible piece can be exchanged for credit.
+    title: EXCHANGES_TITLE,
+    bodyMarkdown: `${EXCHANGES_INTRO}
 
 ## How it works
 1. Request an exchange within **7 days of delivery** from your account or the order lookup page.
@@ -491,7 +496,7 @@ You can download all your data from your account (**Data export**) or delete you
 2. **Orders** are confirmed only when payment is verified with our payment provider. Stock is held for 15 minutes while you pay.
 3. **Payment** is processed by Paystack or Bachs. We do not store card details.
 4. **Delivery** times are estimates in working days.
-5. **Exchanges, not refunds.** See our Exchanges policy. Exchange credit has no cash value.
+5. **Our Exchange Promise.** See our Exchanges policy. Exchange credit has no cash value.
 6. **Unfulfillable orders:** if we cannot supply a piece you have paid for, we will offer you another piece or add the full amount paid to your account as exchange credit. We do not issue cash refunds.
 7. These terms are governed by the laws of the Federal Republic of Nigeria.`,
   },

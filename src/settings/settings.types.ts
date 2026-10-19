@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS: StoredSettings = {
   creditExpiryDays: null,
   freeDeliveryThresholdKobo: 30000000,
   // Design v3 §3: one sentence-case line in the promo bar (only the first message is shown).
-  tickerText: ['Discover Drop 04 — The Night Edit', 'Delivery across Nigeria', 'Exchange, never a refund'],
+  tickerText: ['Delivery across Nigeria · Your satisfaction, our priority'],
   serviceImages: { stylist: null, store: null, exchange: null },
   welcomePopup: {
     enabled: true,

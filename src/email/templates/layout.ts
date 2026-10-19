@@ -70,7 +70,7 @@ export function renderLayout(input: LayoutInput): string {
 <tr><td style="padding:0 0 24px;font-family:${BRAND.serif};font-weight:400;font-size:40px;line-height:44px;letter-spacing:-0.02em;color:${BRAND.ink};">${input.headlineHtml.replace(/<em>/g, `<em style="color:${BRAND.navy};font-style:italic;">`)}</td></tr>
 <tr><td>${input.bodyHtml}${cta}</td></tr>
 <tr><td style="padding:32px 0 40px;">${rule()}
-<p style="margin:0 0 6px;font-family:${BRAND.mono};font-size:11px;letter-spacing:.06em;color:${BRAND.muted};">EXCHANGE, NOT REFUND · LAGOS</p>
+<p style="margin:0 0 6px;font-family:${BRAND.mono};font-size:11px;letter-spacing:.06em;color:${BRAND.muted};">YOUR SATISFACTION, OUR PRIORITY · LAGOS</p>
 <p style="margin:0;font-family:${BRAND.sans};font-size:12px;line-height:18px;color:${BRAND.muted};">${esc(input.footerNote ?? 'Questions? Reply to this email or message a stylist on WhatsApp.')}</p>
 </td></tr>
 </table></td></tr></table></body></html>`;

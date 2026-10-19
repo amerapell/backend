@@ -38,7 +38,7 @@ describe('email templates (brand-styled, escaped)', () => {
     expect(e.html).toContain('#0b1c4f');
     expect(e.html).toContain('Georgia');
     expect(e.html).toContain('₦189,500');
-    expect(e.html).toContain('Exchange, not refund');
+    expect(e.html).toContain('Our Exchange Promise');
     expect(e.html).toContain('Ada &lt;script&gt;');
     expect(e.html).not.toContain('<script>');
     expect(e.text).toContain('Total paid: ₦189,500');

@@ -43,7 +43,7 @@ ${
 </div>
 <table><thead><tr><th>No.</th><th>Piece</th><th>Colour</th><th>Size</th><th class="r">Qty</th><th>✓</th></tr></thead><tbody>${rows}</tbody></table>
 ${notes.length ? `<div class="note"><div class="mono">Notes</div>${notes.map((n) => `<p>${esc(n.body)}</p>`).join('')}</div>` : ''}
-<footer><div class="mono">Exchange, not refund · Unworn pieces with tags may be exchanged for credit · ${esc(settings.contactPhone)}</div></footer>
+<footer><div class="mono">Our Exchange Promise · Unworn pieces with tags may be exchanged for credit · ${esc(settings.contactPhone)}</div></footer>
 <p class="noprint" style="margin-top:24px"><button onclick="window.print()">Print</button></p>
 </body></html>`;
 }
