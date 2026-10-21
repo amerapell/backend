@@ -39,6 +39,13 @@ export class AdminProductsController {
     return this.products.update(id, dto);
   }
 
+  /** Permanent delete of a draft or archived product (204). Must be declared before DELETE :id. */
+  @Delete(':id/permanent')
+  @HttpCode(204)
+  async remove(@Param('id') id: string): Promise<void> {
+    await this.products.deletePermanently(id);
+  }
+
   /** DELETE = archive (order history keeps referencing the product). */
   @Delete(':id')
   archive(@Param('id') id: string) {

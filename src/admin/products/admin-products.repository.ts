@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../db/database.module';
-import { collections, productCollections, productImages, products, variants } from '../../db/schema';
+import { collections, productCollections, productImages, products, stockHolds, variants } from '../../db/schema';
 import type { CollectionRow, ProductRow, VariantRow } from '../../db/schema';
 import type { MatrixVariant } from '../../catalogue/variant-matrix';
 
@@ -24,6 +24,8 @@ export interface AdminProductsRepository {
   create(fields: ProductFields, collectionIds: string[], images: ImageInput[], variants: (MatrixVariant & { stock: number })[]): Promise<string>;
   update(id: string, fields: Partial<ProductFields>, collectionIds?: string[], images?: ImageInput[], changes?: VariantChanges): Promise<void>;
   findProduct(id: string): Promise<ProductRow | null>;
+  /** Removes the product, its variants, images and collection links. 'held' (nothing deleted) while a checkout holds its stock. */
+  deletePermanently(id: string, now: Date): Promise<'deleted' | 'held'>;
   variantsOf(productId: string): Promise<VariantRow[]>;
   findVariant(id: string): Promise<VariantRow | null>;
   updateVariant(id: string, patch: Partial<Pick<VariantRow, 'priceKobo' | 'compareAtKobo' | 'stock' | 'sku'>>): Promise<VariantRow | null>;
@@ -107,6 +109,22 @@ export class DrizzleAdminProductsRepository implements AdminProductsRepository {
         if (changes.create.length) await tx.insert(variants).values(changes.create.map((v) => ({ ...v, productId: id })));
       }
       await tx.update(products).set({ updatedAt: new Date() }).where(eq(products.id, id));
+    });
+  }
+
+  async deletePermanently(id: string, now: Date): Promise<'deleted' | 'held'> {
+    return this.db.transaction(async (tx) => {
+      const [held] = await tx
+        .select({ id: stockHolds.id })
+        .from(stockHolds)
+        .innerJoin(variants, eq(variants.id, stockHolds.variantId))
+        .where(and(eq(variants.productId, id), isNull(stockHolds.releasedAt), isNull(stockHolds.consumedAt), gt(stockHolds.expiresAt, now)))
+        .limit(1);
+      if (held) return 'held';
+      // Variants, images, collection links, holds, carts and notify-me requests cascade; past order lines keep
+      // their own copy of the name, SKU and photo (their product/variant links are set to null).
+      await tx.delete(products).where(eq(products.id, id));
+      return 'deleted';
     });
   }
 

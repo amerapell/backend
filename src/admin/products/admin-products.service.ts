@@ -207,6 +207,15 @@ export class AdminProductsService {
     return this.get(id);
   }
 
+  /** Permanent delete — only for products that are not live (draft or archived). Past orders keep their details. */
+  async deletePermanently(id: string): Promise<void> {
+    const product = await this.repo.findProduct(id);
+    if (!product) throw new NotFoundException('Product not found');
+    if (product.status === 'LIVE') throw new BadRequestException('Archive this product or set it to draft before deleting it');
+    const result = await this.repo.deletePermanently(id, new Date());
+    if (result === 'held') throw new ConflictException('Someone is paying for this product right now — try again in 15 minutes');
+  }
+
   async updateVariant(id: string, dto: UpdateVariantDto) {
     const v = await this.repo.findVariant(id);
     if (!v) throw new NotFoundException('Variant not found');
